@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,31 +16,114 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { categories } from "@/lib/mockData";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { toast } from "sonner";
-import { ArrowLeft, DollarSign, Calendar, Info } from "lucide-react";
+import { ArrowLeft, DollarSign, Calendar, Info, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+const taskSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(10, "Title must be at least 10 characters")
+    .max(100, "Title must be less than 100 characters"),
+  description: z
+    .string()
+    .trim()
+    .min(50, "Description must be at least 50 characters")
+    .max(2000, "Description must be less than 2000 characters"),
+  category_id: z.string().uuid("Please select a category"),
+  budget: z
+    .string()
+    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Budget must be a positive number")
+    .refine((val) => Number(val) >= 5, "Minimum budget is $5")
+    .refine((val) => Number(val) <= 100000, "Maximum budget is $100,000"),
+  deadline: z
+    .string()
+    .refine((val) => {
+      const date = new Date(val);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return date >= today;
+    }, "Deadline must be today or in the future"),
+});
+
+type TaskFormValues = z.infer<typeof taskSchema>;
+
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+}
 
 const PostTask = () => {
   const navigate = useNavigate();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [budget, setBudget] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !description || !category || !budget || !deadline) {
-      toast.error("Please fill in all fields");
+  const form = useForm<TaskFormValues>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      category_id: "",
+      budget: "",
+      deadline: "",
+    },
+  });
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name, icon")
+        .order("name");
+
+      if (error) {
+        toast.error("Failed to load categories");
+        console.error("Error fetching categories:", error);
+      } else {
+        setCategories(data || []);
+      }
+      setIsLoadingCategories(false);
+    };
+
+    fetchCategories();
+  }, []);
+
+  const onSubmit = async (values: TaskFormValues) => {
+    if (!user) {
+      toast.error("You must be logged in to post a task");
       return;
     }
 
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
-    toast.success("Task posted successfully!");
+    const { error } = await supabase.from("tasks").insert({
+      client_id: user.id,
+      title: values.title.trim(),
+      description: values.description.trim(),
+      category_id: values.category_id,
+      budget: Number(values.budget),
+      deadline: new Date(values.deadline).toISOString(),
+      status: "open",
+    });
+
+    if (error) {
+      console.error("Error creating task:", error);
+      toast.error(error.message || "Failed to create task");
+      return;
+    }
+
+    toast.success("Task posted successfully! Freelancers can now submit bids.");
     navigate("/dashboard/client");
   };
 
@@ -47,108 +132,182 @@ const PostTask = () => {
       <Header />
 
       <div className="container py-8 flex-1">
-        <Link to="/dashboard/client" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors">
+        <Link
+          to="/dashboard/client"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to Dashboard
         </Link>
 
         <div className="max-w-2xl mx-auto">
           <h1 className="text-3xl font-bold mb-2">Post a New Task</h1>
-          <p className="text-muted-foreground mb-8">Describe your project and start receiving bids from talented freelancers</p>
+          <p className="text-muted-foreground mb-8">
+            Describe your project and start receiving bids from talented freelancers
+          </p>
 
           <Card>
             <CardContent className="pt-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Task Title</Label>
-                  <Input
-                    id="title"
-                    placeholder="e.g., Build a modern e-commerce website"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Task Title</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Build a modern e-commerce website"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Be specific and descriptive (10-100 characters)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                  <p className="text-xs text-muted-foreground">Be specific and descriptive</p>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe your project in detail. Include requirements, deliverables, and any specific skills needed..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={6}
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe your project in detail. Include requirements, deliverables, and any specific skills needed..."
+                            rows={6}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Include all requirements and deliverables (50-2000 characters)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <FormField
+                    control={form.control}
+                    name="category_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {isLoadingCategories ? (
+                              <div className="flex items-center justify-center py-4">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              </div>
+                            ) : (
+                              categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="budget">Budget</Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="budget"
-                        type="number"
-                        placeholder="500"
-                        value={budget}
-                        onChange={(e) => setBudget(e.target.value)}
-                        className="pl-10"
-                      />
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="budget"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Budget (USD)</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="number"
+                                placeholder="500"
+                                className="pl-10"
+                                min="5"
+                                max="100000"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="deadline"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Deadline</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="date"
+                                className="pl-10"
+                                min={new Date().toISOString().split("T")[0]}
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="bg-muted rounded-lg p-4 flex gap-3">
+                    <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium mb-1">What happens next?</p>
+                      <p className="text-muted-foreground">
+                        After posting, freelancers will start submitting bids. You can review
+                        proposals, chat with candidates, and select the best fit. Payment is
+                        held in escrow until you approve the completed work.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="deadline">Deadline</Label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="deadline"
-                        type="date"
-                        value={deadline}
-                        onChange={(e) => setDeadline(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
+                  <div className="flex gap-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => navigate(-1)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 gradient-hero border-0"
+                      disabled={form.formState.isSubmitting}
+                    >
+                      {form.formState.isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Posting...
+                        </>
+                      ) : (
+                        "Post Task"
+                      )}
+                    </Button>
                   </div>
-                </div>
-
-                <div className="bg-muted rounded-lg p-4 flex gap-3">
-                  <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium mb-1">What happens next?</p>
-                    <p className="text-muted-foreground">
-                      After posting, freelancers will start submitting bids. You can review proposals, 
-                      chat with candidates, and select the best fit. Payment is held in escrow until 
-                      you approve the completed work.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => navigate(-1)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="flex-1 gradient-hero border-0" disabled={isSubmitting}>
-                    {isSubmitting ? "Posting..." : "Post Task"}
-                  </Button>
-                </div>
-              </form>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </div>
