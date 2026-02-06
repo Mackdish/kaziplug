@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +7,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Briefcase, Mail, Lock, ArrowRight } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn, user, role, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const from = location.state?.from?.pathname || null;
+
+  useEffect(() => {
+    if (user && role && !authLoading) {
+      const destination = from || (
+        role === "admin" 
+          ? "/dashboard/admin" 
+          : role === "client" 
+            ? "/dashboard/client" 
+            : "/dashboard/freelancer"
+      );
+      navigate(destination, { replace: true });
+    }
+  }, [user, role, authLoading, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,12 +40,24 @@ const Login = () => {
     }
 
     setIsLoading(true);
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const { error } = await signIn(email, password);
     setIsLoading(false);
+
+    if (error) {
+      toast.error(error.message || "Invalid credentials");
+      return;
+    }
+
     toast.success("Welcome back!");
-    navigate("/dashboard/freelancer");
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

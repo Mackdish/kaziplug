@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -8,19 +8,33 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Briefcase, Mail, Lock, User, ArrowRight, Users, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Database } from "@/integrations/supabase/types";
 
-type UserRole = "client" | "freelancer";
+type UserRole = Database["public"]["Enums"]["app_role"];
 
 const Register = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialRole = (searchParams.get("role") as UserRole) || "freelancer";
+  const { signUp, user, role: userRole, isLoading: authLoading } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>(initialRole);
+  const [role, setRole] = useState<UserRole>(initialRole === "client" ? "client" : "freelancer");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user && userRole && !authLoading) {
+      const destination = userRole === "admin" 
+        ? "/dashboard/admin" 
+        : userRole === "client" 
+          ? "/dashboard/client" 
+          : "/dashboard/freelancer";
+      navigate(destination, { replace: true });
+    }
+  }, [user, userRole, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,12 +43,22 @@ const Register = () => {
       return;
     }
 
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
     setIsLoading(true);
-    // Simulate registration
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const { error } = await signUp(email, password, name, role);
     setIsLoading(false);
-    toast.success("Account created successfully!");
-    navigate(role === "client" ? "/dashboard/client" : "/dashboard/freelancer");
+
+    if (error) {
+      toast.error(error.message || "Registration failed");
+      return;
+    }
+
+    toast.success("Account created! Please check your email to verify your account.");
+    navigate("/login");
   };
 
   const roleOptions = [
@@ -51,6 +75,14 @@ const Register = () => {
       icon: Building2,
     },
   ];
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
