@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusBadge, TaskStatus } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,36 +13,98 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { mockTasks, mockBids } from "@/lib/mockData";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { toast } from "sonner";
 import {
   Calendar,
   Clock,
   DollarSign,
   User,
-  Star,
   Briefcase,
   ArrowLeft,
   Shield,
   CheckCircle,
+  Loader2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTask } from "@/hooks/useTask";
+import { useBidsForTask, useMyBidForTask, useSubmitBid } from "@/hooks/useBids";
+import { format } from "date-fns";
+
+const bidSchema = z.object({
+  amount: z
+    .string()
+    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Amount must be a positive number")
+    .refine((val) => Number(val) >= 5, "Minimum bid is $5"),
+  proposal: z
+    .string()
+    .trim()
+    .min(50, "Proposal must be at least 50 characters")
+    .max(2000, "Proposal must be less than 2000 characters"),
+});
+
+type BidFormValues = z.infer<typeof bidSchema>;
 
 const TaskDetails = () => {
   const { id } = useParams<{ id: string }>();
-  const task = mockTasks.find((t) => t.id === id);
-  const bids = mockBids.filter((b) => b.taskId === id);
+  const { user, role } = useAuth();
+  
+  const { data: task, isLoading: taskLoading, error: taskError } = useTask(id);
+  const { data: bids = [], isLoading: bidsLoading } = useBidsForTask(id || "");
+  const { data: myBid } = useMyBidForTask(id || "", user?.id);
+  const submitBidMutation = useSubmitBid();
 
-  const [bidAmount, setBidAmount] = useState("");
-  const [proposal, setProposal] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const form = useForm<BidFormValues>({
+    resolver: zodResolver(bidSchema),
+    defaultValues: {
+      amount: "",
+      proposal: "",
+    },
+  });
 
-  if (!task) {
+  const isFreelancer = role === "freelancer";
+  const isTaskOwner = user?.id === task?.client_id;
+  const canBid = isFreelancer && task?.status === "open" && !myBid && !isTaskOwner;
+
+  if (taskLoading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <div className="container py-8 flex-1">
+          <Skeleton className="h-6 w-40 mb-6" />
+          <div className="grid lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+            <div className="space-y-6">
+              <Skeleton className="h-64 w-full" />
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (taskError || !task) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Task Not Found</h1>
+            <p className="text-muted-foreground mb-4">
+              This task may have been removed or you don't have permission to view it.
+            </p>
             <Link to="/marketplace">
               <Button>Back to Marketplace</Button>
             </Link>
@@ -58,36 +123,39 @@ const TaskDetails = () => {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "No deadline";
+    return format(new Date(dateString), "EEEE, MMMM d, yyyy");
   };
 
   const daysUntilDeadline = () => {
+    if (!task.deadline) return null;
     const deadline = new Date(task.deadline);
     const today = new Date();
     const diffTime = deadline.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const handleSubmitBid = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bidAmount || !proposal) {
-      toast.error("Please fill in all fields");
+  const handleSubmitBid = async (values: BidFormValues) => {
+    if (!user) {
+      toast.error("You must be logged in to submit a bid");
       return;
     }
 
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
-    toast.success("Your bid has been submitted!");
-    setBidAmount("");
-    setProposal("");
+    if (!id) return;
+
+    try {
+      await submitBidMutation.mutateAsync({
+        taskId: id,
+        freelancerId: user.id,
+        amount: Number(values.amount),
+        proposal: values.proposal.trim(),
+      });
+      toast.success("Your bid has been submitted!");
+      form.reset();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit bid");
+    }
   };
 
   const days = daysUntilDeadline();
@@ -97,8 +165,10 @@ const TaskDetails = () => {
       <Header />
 
       <div className="container py-8">
-        {/* Back Button */}
-        <Link to="/marketplace" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors">
+        <Link
+          to="/marketplace"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to Marketplace
         </Link>
@@ -111,18 +181,22 @@ const TaskDetails = () => {
               <CardHeader>
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="space-y-2">
-                    <StatusBadge status={task.status} />
+                    <StatusBadge status={task.status as TaskStatus} />
                     <h1 className="text-2xl md:text-3xl font-bold">{task.title}</h1>
                     <div className="flex items-center gap-4 text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <User className="h-4 w-4" />
-                        {task.clientName}
+                        {task.client_profile?.full_name || "Anonymous"}
                       </div>
-                      <Badge variant="secondary">{task.category}</Badge>
+                      <Badge variant="secondary">
+                        {task.category?.name || "Uncategorized"}
+                      </Badge>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-3xl font-bold text-accent">{formatBudget(task.budget)}</div>
+                    <div className="text-3xl font-bold text-accent">
+                      {formatBudget(task.budget)}
+                    </div>
                     <p className="text-sm text-muted-foreground">Budget</p>
                   </div>
                 </div>
@@ -133,13 +207,19 @@ const TaskDetails = () => {
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span>Deadline: {formatDate(task.deadline)}</span>
                   </div>
-                  <div className={`flex items-center gap-2 ${days <= 3 ? "text-destructive" : ""}`}>
-                    <Clock className="h-4 w-4" />
-                    <span>{days > 0 ? `${days} days left` : "Overdue"}</span>
-                  </div>
+                  {days !== null && (
+                    <div
+                      className={`flex items-center gap-2 ${
+                        days <= 3 ? "text-destructive" : ""
+                      }`}
+                    >
+                      <Clock className="h-4 w-4" />
+                      <span>{days > 0 ? `${days} days left` : "Overdue"}</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
-                    <span>{task.bidsCount} bids</span>
+                    <span>{bids.length} bids</span>
                   </div>
                 </div>
 
@@ -154,89 +234,217 @@ const TaskDetails = () => {
               </CardContent>
             </Card>
 
-            {/* Bids Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5" />
-                  Bids ({bids.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {bids.length > 0 ? (
-                  bids.map((bid) => (
-                    <div key={bid.id} className="border rounded-lg p-4 hover:border-primary/50 transition-colors">
-                      <div className="flex items-start gap-4">
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={bid.freelancerAvatar} />
-                          <AvatarFallback>{bid.freelancerName[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <h4 className="font-semibold">{bid.freelancerName}</h4>
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                                  {bid.rating}
+            {/* Bids Section - visible to task owner or admins */}
+            {(isTaskOwner || role === "admin") && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Briefcase className="h-5 w-5" />
+                    Bids ({bids.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {bidsLoading ? (
+                    <div className="space-y-4">
+                      {[...Array(2)].map((_, i) => (
+                        <Skeleton key={i} className="h-24 w-full" />
+                      ))}
+                    </div>
+                  ) : bids.length > 0 ? (
+                    bids.map((bid) => (
+                      <div
+                        key={bid.id}
+                        className="border rounded-lg p-4 hover:border-primary/50 transition-colors"
+                      >
+                        <div className="flex items-start gap-4">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={bid.freelancer_profile?.avatar_url || ""} />
+                            <AvatarFallback>
+                              {bid.freelancer_profile?.full_name?.[0] || "F"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <h4 className="font-semibold">
+                                  {bid.freelancer_profile?.full_name || "Anonymous Freelancer"}
+                                </h4>
+                                <p className="text-sm text-muted-foreground">
+                                  Submitted {format(new Date(bid.created_at), "MMM d, yyyy")}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-accent">
+                                  {formatBudget(bid.amount)}
                                 </div>
-                                <span>{bid.completedJobs} jobs completed</span>
+                                <Badge
+                                  variant={
+                                    bid.status === "accepted"
+                                      ? "default"
+                                      : bid.status === "rejected"
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {bid.status}
+                                </Badge>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-xl font-bold text-accent">{formatBudget(bid.amount)}</div>
-                            </div>
+                            <p className="mt-3 text-sm text-muted-foreground whitespace-pre-line">
+                              {bid.proposal}
+                            </p>
                           </div>
-                          <p className="mt-3 text-sm text-muted-foreground">{bid.proposal}</p>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">
+                      No bids yet. Your task is visible in the marketplace.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Your Bid - visible to freelancer who already bid */}
+            {myBid && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-primary" />
+                    Your Bid
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Your bid amount</p>
+                      <p className="text-2xl font-bold text-accent">
+                        {formatBudget(myBid.amount)}
+                      </p>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">
-                    No bids yet. Be the first to bid!
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+                    <Badge
+                      variant={
+                        myBid.status === "accepted"
+                          ? "default"
+                          : myBid.status === "rejected"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {myBid.status}
+                    </Badge>
+                  </div>
+                  <Separator className="my-4" />
+                  <div>
+                    <p className="text-sm font-medium mb-2">Your proposal</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {myBid.proposal}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Place Bid Card */}
-            {task.status === "open" && (
+            {canBid && (
               <Card>
                 <CardHeader>
                   <CardTitle>Place Your Bid</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmitBid} className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Your Bid Amount</label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="number"
-                          placeholder="Enter amount"
-                          value={bidAmount}
-                          onChange={(e) => setBidAmount(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Your Proposal</label>
-                      <Textarea
-                        placeholder="Explain why you're the best fit for this task..."
-                        value={proposal}
-                        onChange={(e) => setProposal(e.target.value)}
-                        rows={5}
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleSubmitBid)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Your Bid Amount</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  type="number"
+                                  placeholder="Enter amount"
+                                  className="pl-10"
+                                  min="5"
+                                  {...field}
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    <Button type="submit" className="w-full gradient-hero border-0" disabled={isSubmitting}>
-                      {isSubmitting ? "Submitting..." : "Submit Bid"}
-                    </Button>
-                  </form>
+                      <FormField
+                        control={form.control}
+                        name="proposal"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Your Proposal</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Explain why you're the best fit for this task..."
+                                rows={5}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="submit"
+                        className="w-full gradient-hero border-0"
+                        disabled={submitBidMutation.isPending}
+                      >
+                        {submitBidMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          "Submit Bid"
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Not logged in prompt */}
+            {!user && task.status === "open" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Want to Bid?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Sign in as a freelancer to submit your bid on this task.
+                  </p>
+                  <Link to="/login">
+                    <Button className="w-full">Sign In to Bid</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Task Owner Actions */}
+            {isTaskOwner && task.status === "open" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Your Task</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    You've received {bids.length} bid{bids.length !== 1 ? "s" : ""} so far.
+                    Review proposals below and select the best freelancer.
+                  </p>
                 </CardContent>
               </Card>
             )}
