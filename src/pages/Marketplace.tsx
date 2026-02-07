@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import TaskCard from "@/components/tasks/TaskCard";
-import { mockTasks, categories } from "@/lib/mockData";
+import MarketplaceTaskCard from "@/components/tasks/MarketplaceTaskCard";
+import { useTasks, useCategories } from "@/hooks/useTasks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,9 @@ const Marketplace = () => {
   const [budgetRange, setBudgetRange] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("newest");
   const [showFilters, setShowFilters] = useState(false);
+
+  const { data: tasks = [], isLoading: tasksLoading } = useTasks("open");
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
 
   const budgetRanges = [
     { value: "all", label: "All Budgets" },
@@ -38,7 +42,7 @@ const Marketplace = () => {
   ];
 
   const filteredTasks = useMemo(() => {
-    let filtered = [...mockTasks];
+    let filtered = [...tasks];
 
     // Search filter
     if (searchQuery) {
@@ -47,13 +51,13 @@ const Marketplace = () => {
         (task) =>
           task.title.toLowerCase().includes(query) ||
           task.description.toLowerCase().includes(query) ||
-          task.category.toLowerCase().includes(query)
+          (task.category?.name?.toLowerCase().includes(query) ?? false)
       );
     }
 
     // Category filter
     if (selectedCategory !== "all") {
-      filtered = filtered.filter((task) => task.category === selectedCategory);
+      filtered = filtered.filter((task) => task.category?.name === selectedCategory);
     }
 
     // Budget filter
@@ -74,15 +78,19 @@ const Marketplace = () => {
         filtered.sort((a, b) => a.budget - b.budget);
         break;
       case "deadline":
-        filtered.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+        filtered.sort((a, b) => {
+          if (!a.deadline) return 1;
+          if (!b.deadline) return -1;
+          return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+        });
         break;
       case "newest":
       default:
-        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
     return filtered;
-  }, [searchQuery, selectedCategory, budgetRange, sortBy]);
+  }, [tasks, searchQuery, selectedCategory, budgetRange, sortBy]);
 
   const activeFiltersCount = [
     selectedCategory !== "all",
@@ -160,8 +168,8 @@ const Marketplace = () => {
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
                     {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
+                      <SelectItem key={cat.id} value={cat.name}>
+                        {cat.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -191,12 +199,12 @@ const Marketplace = () => {
                 <div className="flex flex-wrap gap-2">
                   {categories.slice(0, 5).map((cat) => (
                     <Badge
-                      key={cat}
-                      variant={selectedCategory === cat ? "default" : "secondary"}
+                      key={cat.id}
+                      variant={selectedCategory === cat.name ? "default" : "secondary"}
                       className="cursor-pointer"
-                      onClick={() => setSelectedCategory(selectedCategory === cat ? "all" : cat)}
+                      onClick={() => setSelectedCategory(selectedCategory === cat.name ? "all" : cat.name)}
                     >
-                      {cat}
+                      {cat.name}
                     </Badge>
                   ))}
                 </div>
@@ -252,11 +260,25 @@ const Marketplace = () => {
             )}
 
             {/* Tasks */}
-            {filteredTasks.length > 0 ? (
+            {tasksLoading || categoriesLoading ? (
+              <div className="grid md:grid-cols-2 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="bg-card rounded-lg p-6 space-y-4">
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <div className="flex gap-4">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredTasks.length > 0 ? (
               <div className="grid md:grid-cols-2 gap-6">
                 {filteredTasks.map((task, index) => (
                   <div key={task.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
-                    <TaskCard task={task} />
+                    <MarketplaceTaskCard task={task} />
                   </div>
                 ))}
               </div>
