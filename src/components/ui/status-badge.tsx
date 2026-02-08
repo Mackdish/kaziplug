@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 
-export type TaskStatus = "open" | "in_progress" | "completed" | "escrow" | "paid";
+// Support both database task_status and UI-only statuses
+export type TaskStatus = "open" | "in_progress" | "completed" | "cancelled" | "escrow" | "paid";
 
 interface StatusBadgeProps {
   status: TaskStatus;
@@ -19,6 +20,10 @@ const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
   completed: {
     label: "Completed",
     className: "status-completed",
+  },
+  cancelled: {
+    label: "Cancelled",
+    className: "status-cancelled",
   },
   escrow: {
     label: "Escrow Held",
