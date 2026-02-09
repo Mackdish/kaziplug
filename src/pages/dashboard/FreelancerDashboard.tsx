@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWallet } from "@/hooks/useWallet";
 import { useProfile } from "@/hooks/useProfile";
 import { useFreelancerBids, useFreelancerActiveTasks, useFreelancerCompletedTasks } from "@/hooks/useFreelancerBids";
+import { WithdrawalDialog } from "@/components/dashboard/WithdrawalDialog";
 import {
   Briefcase,
   Wallet,
@@ -25,6 +27,7 @@ import {
 } from "lucide-react";
 
 const FreelancerDashboard = () => {
+  const [withdrawalOpen, setWithdrawalOpen] = useState(false);
   const { user } = useAuth();
   const { data: wallet, isLoading: walletLoading } = useWallet(user?.id);
   const { data: profile, isLoading: profileLoading } = useProfile(user?.id);
@@ -282,7 +285,11 @@ const FreelancerDashboard = () => {
                     )}
                   </div>
                 </div>
-                <Button className="w-full mt-6 bg-card text-foreground hover:bg-card/90">
+                <Button
+                  className="w-full mt-6 bg-card text-foreground hover:bg-card/90"
+                  onClick={() => setWithdrawalOpen(true)}
+                  disabled={!wallet || wallet.available_balance <= 0}
+                >
                   <DollarSign className="h-4 w-4 mr-2" />
                   Withdraw Funds
                 </Button>
@@ -339,6 +346,14 @@ const FreelancerDashboard = () => {
           </div>
         </div>
       </div>
+      {user && (
+        <WithdrawalDialog
+          open={withdrawalOpen}
+          onOpenChange={setWithdrawalOpen}
+          userId={user.id}
+          availableBalance={wallet?.available_balance || 0}
+        />
+      )}
     </div>
   );
 };
