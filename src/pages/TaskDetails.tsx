@@ -33,10 +33,13 @@ import {
   Shield,
   CheckCircle,
   Loader2,
+  Smartphone,
+  Phone,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTask } from "@/hooks/useTask";
 import { useBidsForTask, useMyBidForTask, useSubmitBid } from "@/hooks/useBids";
+import { useBidFeePayment, useInitiateBidFeePayment } from "@/hooks/useBidFeePayment";
 import { format } from "date-fns";
 
 const bidSchema = z.object({
@@ -56,11 +59,14 @@ type BidFormValues = z.infer<typeof bidSchema>;
 const TaskDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { user, role } = useAuth();
+  const [mpesaPhone, setMpesaPhone] = useState("");
   
   const { data: task, isLoading: taskLoading, error: taskError } = useTask(id);
   const { data: bids = [], isLoading: bidsLoading } = useBidsForTask(id || "");
   const { data: myBid } = useMyBidForTask(id || "", user?.id);
+  const { data: bidFeePayment, isLoading: feeLoading } = useBidFeePayment(id || "", user?.id);
   const submitBidMutation = useSubmitBid();
+  const initiateBidFee = useInitiateBidFeePayment();
 
   const form = useForm<BidFormValues>({
     resolver: zodResolver(bidSchema),
@@ -72,7 +78,27 @@ const TaskDetails = () => {
 
   const isFreelancer = role === "freelancer";
   const isTaskOwner = user?.id === task?.client_id;
+  const hasPaidFee = bidFeePayment?.status === "completed";
+  const feePending = bidFeePayment?.status === "pending";
   const canBid = isFreelancer && task?.status === "open" && !myBid && !isTaskOwner;
+
+  const handlePayBidFee = async () => {
+    if (!user || !id) return;
+    if (!mpesaPhone || mpesaPhone.length < 10) {
+      toast.error("Please enter a valid M-Pesa phone number");
+      return;
+    }
+    try {
+      await initiateBidFee.mutateAsync({
+        userId: user.id,
+        taskId: id,
+        phoneNumber: mpesaPhone,
+      });
+      toast.success("STK push sent! Check your phone to complete payment.");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to initiate payment");
+    }
+  };
 
   if (taskLoading) {
     return (
@@ -356,63 +382,131 @@ const TaskDetails = () => {
                   <CardTitle>Place Your Bid</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmitBid)} className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="amount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Your Bid Amount</FormLabel>
-                            <FormControl>
+                  {/* Step 1: Pay bid fee */}
+                  {!hasPaidFee && (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-lg bg-muted border border-border">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Smartphone className="h-5 w-5 text-primary" />
+                          <h4 className="font-semibold">Bid Fee Required</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          A fee of <span className="font-bold text-foreground">KES 55</span> is required via M-Pesa before you can place a bid.
+                        </p>
+
+                        {feePending ? (
+                          <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 text-primary">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm font-medium">
+                              Waiting for M-Pesa confirmation...
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">M-Pesa Phone Number</label>
                               <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  type="number"
-                                  placeholder="Enter amount"
+                                  placeholder="e.g. 0712345678"
+                                  value={mpesaPhone}
+                                  onChange={(e) => setMpesaPhone(e.target.value)}
                                   className="pl-10"
-                                  min="5"
-                                  {...field}
                                 />
                               </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="proposal"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Your Proposal</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Explain why you're the best fit for this task..."
-                                rows={5}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        type="submit"
-                        className="w-full gradient-hero border-0"
-                        disabled={submitBidMutation.isPending}
-                      >
-                        {submitBidMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Submitting...
+                            </div>
+                            <Button
+                              className="w-full mt-3 gradient-hero border-0"
+                              onClick={handlePayBidFee}
+                              disabled={initiateBidFee.isPending}
+                            >
+                              {initiateBidFee.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Sending STK Push...
+                                </>
+                              ) : (
+                                "Pay KES 55 via M-Pesa"
+                              )}
+                            </Button>
                           </>
-                        ) : (
-                          "Submit Bid"
                         )}
-                      </Button>
-                    </form>
-                  </Form>
+
+                        {bidFeePayment?.status === "failed" && (
+                          <p className="text-sm text-destructive mt-2">
+                            Payment failed. Please try again.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Submit bid (only after payment) */}
+                  {hasPaidFee && (
+                    <>
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 text-accent mb-4">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Bid fee paid ✓</span>
+                      </div>
+                      <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleSubmitBid)} className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="amount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Your Bid Amount</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                      type="number"
+                                      placeholder="Enter amount"
+                                      className="pl-10"
+                                      min="5"
+                                      {...field}
+                                    />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="proposal"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Your Proposal</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Explain why you're the best fit for this task..."
+                                    rows={5}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="submit"
+                            className="w-full gradient-hero border-0"
+                            disabled={submitBidMutation.isPending}
+                          >
+                            {submitBidMutation.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Submitting...
+                              </>
+                            ) : (
+                              "Submit Bid"
+                            )}
+                          </Button>
+                        </form>
+                      </Form>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
