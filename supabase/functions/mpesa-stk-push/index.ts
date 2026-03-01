@@ -6,19 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function getTumaAccessToken(): Promise<string> {
-  const email = Deno.env.get("TUMA_EMAIL")!;
-  const password = Deno.env.get("TUMA_PASSWORD")!;
-
-  const res = await fetch("https://api.tuma.co.ke/auth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!res.ok) throw new Error(`Failed to get Tuma token: ${res.statusText}`);
-  const data = await res.json();
-  return data.token;
+function getTumaApiKey(): string {
+  return Deno.env.get("TUMA_API_KEY")!;
 }
 
 Deno.serve(async (req) => {
@@ -42,13 +31,13 @@ Deno.serve(async (req) => {
       formattedPhone = `254${formattedPhone}`;
     }
 
-    const accessToken = await getTumaAccessToken();
+    const apiKey = getTumaApiKey();
     const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
 
     const stkRes = await fetch("https://api.tuma.co.ke/payment/stk-push", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
