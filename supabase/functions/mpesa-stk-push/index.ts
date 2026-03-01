@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        amount: 55,
+        amount: 30,
         phone: formattedPhone,
         callback_url: callbackUrl,
         description: `BidFee-${payment_id.substring(0, 8)}`,

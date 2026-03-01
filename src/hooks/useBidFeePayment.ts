@@ -58,7 +58,7 @@ export const useInitiateBidFeePayment = () => {
         .insert({
           user_id: userId,
           task_id: taskId,
-          amount: 55,
+          amount: 30,
           phone_number: phoneNumber,
         })
         .select()
