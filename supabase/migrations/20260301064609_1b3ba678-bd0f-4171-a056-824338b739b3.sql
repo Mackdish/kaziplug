@@ -1,0 +1,1 @@
+ALTER TABLE public.bid_fee_payments ALTER COLUMN amount SET DEFAULT 30;

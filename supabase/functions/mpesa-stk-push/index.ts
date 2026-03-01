@@ -6,8 +6,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function getTumaApiKey(): string {
-  return Deno.env.get("TUMA_API_KEY")!;
+async function getTumaAccessToken(): Promise<string> {
+  const email = Deno.env.get("TUMA_EMAIL")!;
+  const apiKey = Deno.env.get("TUMA_API_KEY")!;
+
+  const res = await fetch("https://api.tuma.co.ke/auth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, api_key: apiKey }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Failed to get Tuma token: ${res.status} ${errBody}`);
+  }
+  const data = await res.json();
+  return data.token;
 }
 
 Deno.serve(async (req) => {
@@ -31,13 +45,15 @@ Deno.serve(async (req) => {
       formattedPhone = `254${formattedPhone}`;
     }
 
-    const apiKey = getTumaApiKey();
+    const accessToken = await getTumaAccessToken();
     const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
+
+    console.log("Sending STK push to Tuma:", { phone: formattedPhone, amount: 30, callbackUrl });
 
     const stkRes = await fetch("https://api.tuma.co.ke/payment/stk-push", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -49,9 +65,9 @@ Deno.serve(async (req) => {
     });
 
     const stkData = await stkRes.json();
+    console.log("Tuma STK response:", JSON.stringify(stkData));
 
     if (stkData.success) {
-      // Update payment record with Tuma payment ID
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -77,6 +93,7 @@ Deno.serve(async (req) => {
       );
     }
   } catch (error) {
+    console.error("STK push error:", error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
