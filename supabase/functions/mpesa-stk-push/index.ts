@@ -6,29 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function getMpesaAccessToken(): Promise<string> {
-  const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY")!;
-  const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET")!;
-  const credentials = btoa(`${consumerKey}:${consumerSecret}`);
+async function getTumaAccessToken(): Promise<string> {
+  const email = Deno.env.get("TUMA_EMAIL")!;
+  const password = Deno.env.get("TUMA_PASSWORD")!;
 
-  const baseUrl = Deno.env.get("MPESA_ENV") === "production"
-    ? "https://api.safaricom.co.ke"
-    : "https://sandbox.safaricom.co.ke";
+  const res = await fetch("https://api.tuma.co.ke/auth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
 
-  const res = await fetch(
-    `${baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
-    { headers: { Authorization: `Basic ${credentials}` } }
-  );
-
-  if (!res.ok) throw new Error(`Failed to get M-Pesa token: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Failed to get Tuma token: ${res.statusText}`);
   const data = await res.json();
-  return data.access_token;
-}
-
-function getTimestamp(): string {
-  const now = new Date();
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return data.token;
 }
 
 Deno.serve(async (req) => {
@@ -52,46 +42,27 @@ Deno.serve(async (req) => {
       formattedPhone = `254${formattedPhone}`;
     }
 
-    const shortcode = Deno.env.get("MPESA_SHORTCODE")!;
-    const passkey = Deno.env.get("MPESA_PASSKEY")!;
-    const timestamp = getTimestamp();
-    const password = btoa(`${shortcode}${passkey}${timestamp}`);
-
-    const baseUrl = Deno.env.get("MPESA_ENV") === "production"
-      ? "https://api.safaricom.co.ke"
-      : "https://sandbox.safaricom.co.ke";
-
-    const accessToken = await getMpesaAccessToken();
-
+    const accessToken = await getTumaAccessToken();
     const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
 
-    const stkPayload = {
-      BusinessShortCode: shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
-      Amount: 55,
-      PartyA: formattedPhone,
-      PartyB: shortcode,
-      PhoneNumber: formattedPhone,
-      CallBackURL: callbackUrl,
-      AccountReference: `BidFee-${payment_id.substring(0, 8)}`,
-      TransactionDesc: "Bid Fee Payment",
-    };
-
-    const stkRes = await fetch(`${baseUrl}/mpesa/stkpush/v1/processrequest`, {
+    const stkRes = await fetch("https://api.tuma.co.ke/payment/stk-push", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(stkPayload),
+      body: JSON.stringify({
+        amount: 55,
+        phone: formattedPhone,
+        callback_url: callbackUrl,
+        description: `BidFee-${payment_id.substring(0, 8)}`,
+      }),
     });
 
     const stkData = await stkRes.json();
 
-    if (stkData.ResponseCode === "0") {
-      // Update payment record with checkout request ID
+    if (stkData.success) {
+      // Update payment record with Tuma payment ID
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -99,20 +70,20 @@ Deno.serve(async (req) => {
 
       await supabase
         .from("bid_fee_payments")
-        .update({ checkout_request_id: stkData.CheckoutRequestID })
+        .update({ checkout_request_id: stkData.payment_id || stkData.merchant_request_id })
         .eq("id", payment_id);
 
       return new Response(
         JSON.stringify({
           success: true,
-          checkout_request_id: stkData.CheckoutRequestID,
+          checkout_request_id: stkData.payment_id || stkData.merchant_request_id,
           message: "STK push sent. Check your phone.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
       return new Response(
-        JSON.stringify({ error: stkData.errorMessage || "STK push failed", details: stkData }),
+        JSON.stringify({ error: stkData.message || "STK push failed", details: stkData }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

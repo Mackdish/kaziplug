@@ -13,45 +13,71 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const callback = body?.Body?.stkCallback;
-
-    if (!callback) {
-      return new Response(JSON.stringify({ error: "Invalid callback" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { CheckoutRequestID, ResultCode, CallbackMetadata } = callback;
+    console.log("Tuma callback received:", JSON.stringify(body));
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    if (ResultCode === 0) {
-      // Payment successful
-      let mpesaReceipt = "";
-      if (CallbackMetadata?.Item) {
-        const receiptItem = CallbackMetadata.Item.find(
-          (item: any) => item.Name === "MpesaReceiptNumber"
-        );
-        mpesaReceipt = receiptItem?.Value || "";
+    // Tuma callback format
+    const {
+      payment_id,
+      merchant_request_id,
+      status,
+      mpesa_receipt_number,
+    } = body;
+
+    const lookupId = payment_id || merchant_request_id;
+
+    if (!lookupId) {
+      // Fallback: try Daraja-style callback format
+      const callback = body?.Body?.stkCallback;
+      if (callback) {
+        const { CheckoutRequestID, ResultCode, CallbackMetadata } = callback;
+        if (ResultCode === 0) {
+          let mpesaReceipt = "";
+          if (CallbackMetadata?.Item) {
+            const receiptItem = CallbackMetadata.Item.find(
+              (item: any) => item.Name === "MpesaReceiptNumber"
+            );
+            mpesaReceipt = receiptItem?.Value || "";
+          }
+          await supabase
+            .from("bid_fee_payments")
+            .update({ status: "completed", mpesa_receipt: mpesaReceipt })
+            .eq("checkout_request_id", CheckoutRequestID);
+        } else {
+          await supabase
+            .from("bid_fee_payments")
+            .update({ status: "failed" })
+            .eq("checkout_request_id", CheckoutRequestID);
+        }
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
+      return new Response(JSON.stringify({ error: "Invalid callback payload" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Tuma callback handling
+    if (status === "completed" || status === "success") {
       await supabase
         .from("bid_fee_payments")
         .update({
           status: "completed",
-          mpesa_receipt: mpesaReceipt,
+          mpesa_receipt: mpesa_receipt_number || "",
         })
-        .eq("checkout_request_id", CheckoutRequestID);
+        .eq("checkout_request_id", lookupId);
     } else {
-      // Payment failed
       await supabase
         .from("bid_fee_payments")
         .update({ status: "failed" })
-        .eq("checkout_request_id", CheckoutRequestID);
+        .eq("checkout_request_id", lookupId);
     }
 
     return new Response(JSON.stringify({ success: true }), {
