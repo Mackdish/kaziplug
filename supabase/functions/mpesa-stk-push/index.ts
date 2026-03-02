@@ -16,12 +16,17 @@ async function getTumaAccessToken(): Promise<string> {
     body: JSON.stringify({ email, api_key: apiKey }),
   });
 
+  const rawBody = await res.text();
+  console.log("Tuma auth response status:", res.status, "body:", rawBody);
+
   if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`Failed to get Tuma token: ${res.status} ${errBody}`);
+    throw new Error(`Failed to get Tuma token: ${res.status} ${rawBody}`);
   }
-  const data = await res.json();
-  return data.token;
+  const data = JSON.parse(rawBody);
+  const token = data?.data?.token || data?.token;
+  if (!token) throw new Error(`No token in Tuma response: ${rawBody}`);
+  console.log("Tuma token obtained successfully");
+  return token;
 }
 
 Deno.serve(async (req) => {
