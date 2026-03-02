@@ -15,7 +15,7 @@ const MarketplaceTaskCard = ({ task }: MarketplaceTaskCardProps) => {
     : "No deadline";
 
   return (
-    <Link to={`/tasks/${task.id}`}>
+    <Link to={`/task/${task.id}#place-bid`}>
       <Card className="h-full hover:shadow-lg transition-shadow duration-300 border-border/50 hover:border-primary/30">
         <CardContent className="p-6">
           <div className="flex items-start justify-between gap-4 mb-3">

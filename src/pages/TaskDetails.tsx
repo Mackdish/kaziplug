@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -59,6 +59,8 @@ type BidFormValues = z.infer<typeof bidSchema>;
 const TaskDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { user, role } = useAuth();
+  const location = useLocation();
+  const bidSectionRef = useRef<HTMLDivElement>(null);
   const [mpesaPhone, setMpesaPhone] = useState("");
   
   const { data: task, isLoading: taskLoading, error: taskError } = useTask(id);
@@ -81,6 +83,15 @@ const TaskDetails = () => {
   const hasPaidFee = bidFeePayment?.status === "completed";
   const feePending = bidFeePayment?.status === "pending";
   const canBid = isFreelancer && task?.status === "open" && !myBid && !isTaskOwner;
+
+  // Auto-scroll to bid section when hash is #place-bid
+  useEffect(() => {
+    if (location.hash === "#place-bid" && bidSectionRef.current) {
+      setTimeout(() => {
+        bidSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+  }, [location.hash, taskLoading]);
 
   const handlePayBidFee = async () => {
     if (!user || !id) return;
@@ -377,7 +388,7 @@ const TaskDetails = () => {
           <div className="space-y-6">
             {/* Place Bid Card */}
             {canBid && (
-              <Card>
+              <Card id="place-bid" ref={bidSectionRef}>
                 <CardHeader>
                   <CardTitle>Place Your Bid</CardTitle>
                 </CardHeader>
