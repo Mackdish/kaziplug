@@ -1,123 +1,121 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockTasks, mockUser } from "@/lib/mockData";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge, TaskStatus } from "@/components/ui/status-badge";
+import { toast } from "sonner";
+import {
+  useAdminStats,
+  useAdminUsers,
+  useAdminTasks,
+  useAdminWithdrawals,
+  useUpdateWithdrawalStatus,
+  useUpdateTaskStatus,
+} from "@/hooks/useAdmin";
+import { format } from "date-fns";
 import {
   Users,
   Briefcase,
   DollarSign,
   AlertTriangle,
   Search,
-  Settings,
-  Shield,
-  TrendingUp,
-  BarChart3,
-  Ban,
   CheckCircle2,
-  Clock,
-  ArrowUpRight,
+  XCircle,
+  UserCheck,
+  UserX,
+  Loader2,
 } from "lucide-react";
 
 const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("all");
 
-  const stats = [
-    {
-      title: "Total Users",
-      value: "12,458",
-      change: "+12%",
-      icon: Users,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-    },
-    {
-      title: "Active Tasks",
-      value: "3,842",
-      change: "+8%",
-      icon: Briefcase,
-      color: "text-accent",
-      bgColor: "bg-accent/10",
-    },
-    {
-      title: "Total Revenue",
-      value: "$124,500",
-      change: "+23%",
-      icon: DollarSign,
-      color: "text-accent",
-      bgColor: "bg-accent/10",
-    },
-    {
-      title: "Pending Disputes",
-      value: "24",
-      change: "-5%",
-      icon: AlertTriangle,
-      color: "text-warning",
-      bgColor: "bg-warning/10",
-    },
-  ];
+  const { data: stats, isLoading: statsLoading } = useAdminStats();
+  const { data: users = [], isLoading: usersLoading } = useAdminUsers(userRoleFilter);
+  const { data: tasks = [], isLoading: tasksLoading } = useAdminTasks();
+  const { data: withdrawals = [], isLoading: withdrawalsLoading } = useAdminWithdrawals();
+  const updateWithdrawal = useUpdateWithdrawalStatus();
+  const updateTask = useUpdateTaskStatus();
 
-  const recentUsers = [
-    { id: "1", name: "Alex Johnson", email: "alex@email.com", role: "freelancer", status: "active" },
-    { id: "2", name: "Sarah Chen", email: "sarah@email.com", role: "client", status: "active" },
-    { id: "3", name: "Mike Williams", email: "mike@email.com", role: "freelancer", status: "pending" },
-    { id: "4", name: "Emily Brown", email: "emily@email.com", role: "client", status: "suspended" },
-  ];
+  const filteredUsers = users.filter(
+    (u) =>
+      !searchQuery ||
+      u.profile?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.user_id.includes(searchQuery)
+  );
 
-  const pendingWithdrawals = [
-    { id: "w1", user: "Alex Johnson", amount: 1250, method: "Stripe", date: "2024-01-25" },
-    { id: "w2", user: "Sarah Chen", amount: 890, method: "M-Pesa", date: "2024-01-24" },
-    { id: "w3", user: "James Wilson", amount: 2100, method: "Stripe", date: "2024-01-24" },
+  const filteredTasks = tasks.filter(
+    (t: any) =>
+      !searchQuery ||
+      t.title?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleWithdrawalAction = async (id: string, status: "completed" | "failed") => {
+    try {
+      await updateWithdrawal.mutateAsync({ id, status });
+      toast.success(`Withdrawal ${status === "completed" ? "approved" : "rejected"}`);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleTaskAction = async (id: string, status: "cancelled") => {
+    try {
+      await updateTask.mutateAsync({ id, status });
+      toast.success("Task cancelled");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const statCards = [
+    { title: "Clients", value: stats?.totalClients ?? "—", icon: UserCheck, color: "text-primary", bgColor: "bg-primary/10" },
+    { title: "Freelancers", value: stats?.totalFreelancers ?? "—", icon: Users, color: "text-accent", bgColor: "bg-accent/10" },
+    { title: "Total Tasks", value: stats?.totalTasks ?? "—", icon: Briefcase, color: "text-primary", bgColor: "bg-primary/10" },
+    { title: "Pending Withdrawals", value: stats?.pendingWithdrawals ?? "—", icon: DollarSign, color: "text-destructive", bgColor: "bg-destructive/10" },
   ];
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-
       <div className="container py-8 flex-1">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage users, tasks, and platform settings</p>
+            <p className="text-muted-foreground">Manage users, tasks, and platform operations</p>
           </div>
-          <div className="flex gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search users, tasks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-64"
-              />
-            </div>
-            <Button variant="outline" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Settings
-            </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users, tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-64"
+            />
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat) => (
+          {statCards.map((stat) => (
             <Card key={stat.title}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between">
                   <div className={`h-12 w-12 rounded-xl ${stat.bgColor} flex items-center justify-center`}>
                     <stat.icon className={`h-6 w-6 ${stat.color}`} />
                   </div>
-                  <Badge variant={stat.change.startsWith("+") ? "default" : "secondary"} className="gap-1">
-                    <ArrowUpRight className="h-3 w-3" />
-                    {stat.change}
-                  </Badge>
                 </div>
                 <div className="mt-4">
-                  <p className="text-2xl font-bold">{stat.value}</p>
+                  {statsLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <p className="text-2xl font-bold">{stat.value}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">{stat.title}</p>
                 </div>
               </CardContent>
@@ -125,172 +123,157 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        <Tabs defaultValue="users" className="space-y-6">
+        <Tabs defaultValue="clients" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="users" className="gap-2">
+            <TabsTrigger value="clients" className="gap-2">
+              <UserCheck className="h-4 w-4" />
+              Clients
+            </TabsTrigger>
+            <TabsTrigger value="freelancers" className="gap-2">
               <Users className="h-4 w-4" />
-              Users
+              Freelancers
             </TabsTrigger>
             <TabsTrigger value="tasks" className="gap-2">
               <Briefcase className="h-4 w-4" />
               Tasks
             </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2">
+            <TabsTrigger value="withdrawals" className="gap-2">
               <DollarSign className="h-4 w-4" />
-              Payments
-            </TabsTrigger>
-            <TabsTrigger value="disputes" className="gap-2">
-              <Shield className="h-4 w-4" />
-              Disputes
+              Withdrawals
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="users" className="space-y-6">
-            <div className="grid lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Recent Users</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {recentUsers.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between p-4 rounded-lg border">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                            {user.name[0]}
-                          </div>
-                          <div>
-                            <p className="font-medium">{user.name}</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="secondary">{user.role}</Badge>
-                          <Badge 
-                            variant={
-                              user.status === "active" ? "default" : 
-                              user.status === "pending" ? "secondary" : "destructive"
-                            }
-                          >
-                            {user.status}
-                          </Badge>
-                          <Button variant="ghost" size="sm">
-                            <Ban className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>User Stats</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Freelancers</span>
-                    <span className="font-semibold">8,234</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Clients</span>
-                    <span className="font-semibold">4,224</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Pending Verification</span>
-                    <span className="font-semibold">156</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Suspended</span>
-                    <span className="font-semibold text-destructive">23</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          {/* Clients Tab */}
+          <TabsContent value="clients">
+            <UserList users={filteredUsers.filter(u => u.role === "client")} loading={usersLoading} roleLabel="Client" />
           </TabsContent>
 
-          <TabsContent value="payments" className="space-y-6">
-            <div className="grid lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Pending Withdrawals</CardTitle>
-                  <Badge variant="secondary">{pendingWithdrawals.length}</Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {pendingWithdrawals.map((withdrawal) => (
-                      <div key={withdrawal.id} className="flex items-center justify-between p-4 rounded-lg border">
-                        <div>
-                          <p className="font-medium">{withdrawal.user}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>{withdrawal.method}</span>
-                            <span>•</span>
-                            <span>{withdrawal.date}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-accent">${withdrawal.amount}</span>
-                          <Button size="sm" className="gradient-accent border-0">
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            Reject
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Platform Revenue</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">This Month</p>
-                    <p className="text-2xl font-bold text-accent">$24,580</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Last Month</p>
-                    <p className="text-xl font-semibold">$21,340</p>
-                  </div>
-                  <div className="pt-4 border-t">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-muted-foreground">Platform Fee</span>
-                      <span className="font-semibold">10%</span>
-                    </div>
-                    <Button variant="outline" className="w-full gap-2">
-                      <Settings className="h-4 w-4" />
-                      Adjust Fee
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          {/* Freelancers Tab */}
+          <TabsContent value="freelancers">
+            <UserList users={filteredUsers.filter(u => u.role === "freelancer")} loading={usersLoading} roleLabel="Freelancer" />
           </TabsContent>
 
+          {/* Tasks Tab */}
           <TabsContent value="tasks">
             <Card>
               <CardHeader>
-                <CardTitle>Task Management</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5" />
+                  All Tasks ({filteredTasks.length})
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">Task management interface coming soon...</p>
+                {tasksLoading ? (
+                  <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+                  </div>
+                ) : filteredTasks.length > 0 ? (
+                  <div className="space-y-3">
+                    {filteredTasks.map((task: any) => (
+                      <div key={task.id} className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h4 className="font-medium truncate">{task.title}</h4>
+                            <StatusBadge status={task.status as TaskStatus} />
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>Budget: ${task.budget}</span>
+                            <span>{task.category?.name || "Uncategorized"}</span>
+                            <span>{task.bids?.length || 0} bids</span>
+                            <span>{format(new Date(task.created_at), "MMM d, yyyy")}</span>
+                          </div>
+                        </div>
+                        {task.status === "open" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                            onClick={() => handleTaskAction(task.id, "cancelled")}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No tasks found.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="disputes">
+          {/* Withdrawals Tab */}
+          <TabsContent value="withdrawals">
             <Card>
               <CardHeader>
-                <CardTitle>Dispute Resolution</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Withdrawals
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">Dispute management interface coming soon...</p>
+                {withdrawalsLoading ? (
+                  <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+                  </div>
+                ) : withdrawals.length > 0 ? (
+                  <div className="space-y-3">
+                    {withdrawals.map((w: any) => (
+                      <div key={w.id} className="flex items-center justify-between p-4 rounded-lg border">
+                        <div>
+                          <p className="font-medium">{w.profile?.full_name || "Unknown User"}</p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{w.method}</span>
+                            {w.phone_number && <span>• {w.phone_number}</span>}
+                            <span>• {format(new Date(w.created_at), "MMM d, yyyy")}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-lg">${w.amount}</span>
+                          <Badge
+                            variant={
+                              w.status === "completed" ? "default" :
+                              w.status === "failed" ? "destructive" :
+                              "secondary"
+                            }
+                          >
+                            {w.status}
+                          </Badge>
+                          {w.status === "requested" && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleWithdrawalAction(w.id, "completed")}
+                                disabled={updateWithdrawal.isPending}
+                              >
+                                {updateWithdrawal.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                                    Approve
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleWithdrawalAction(w.id, "failed")}
+                                disabled={updateWithdrawal.isPending}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No withdrawals yet.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -299,5 +282,56 @@ const AdminDashboard = () => {
     </div>
   );
 };
+
+// Reusable user list component
+const UserList = ({
+  users,
+  loading,
+  roleLabel,
+}: {
+  users: any[];
+  loading: boolean;
+  roleLabel: string;
+}) => (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Users className="h-5 w-5" />
+        {roleLabel}s ({users.length})
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      {loading ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+        </div>
+      ) : users.length > 0 ? (
+        <div className="space-y-3">
+          {users.map((user) => (
+            <div key={user.id} className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {user.profile?.full_name?.[0]?.toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{user.profile?.full_name || "Unnamed User"}</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {user.profile?.phone && <span>{user.profile.phone}</span>}
+                    <span>Joined {format(new Date(user.created_at), "MMM d, yyyy")}</span>
+                  </div>
+                </div>
+              </div>
+              <Badge variant="secondary">{user.role}</Badge>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-center text-muted-foreground py-8">No {roleLabel.toLowerCase()}s found.</p>
+      )}
+    </CardContent>
+  </Card>
+);
 
 export default AdminDashboard;

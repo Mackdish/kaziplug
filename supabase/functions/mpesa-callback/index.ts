@@ -20,64 +20,52 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Tuma callback format
+    // Tuma callback format:
+    // { merchant_request_id, checkout_request_id, status, message, amount, mpesa_receipt_number, transaction_date, phone_number }
     const {
-      payment_id,
+      checkout_request_id,
       merchant_request_id,
       status,
       mpesa_receipt_number,
     } = body;
 
-    const lookupId = payment_id || merchant_request_id;
+    const lookupId = checkout_request_id || merchant_request_id;
 
     if (!lookupId) {
-      // Fallback: try Daraja-style callback format
-      const callback = body?.Body?.stkCallback;
-      if (callback) {
-        const { CheckoutRequestID, ResultCode, CallbackMetadata } = callback;
-        if (ResultCode === 0) {
-          let mpesaReceipt = "";
-          if (CallbackMetadata?.Item) {
-            const receiptItem = CallbackMetadata.Item.find(
-              (item: any) => item.Name === "MpesaReceiptNumber"
-            );
-            mpesaReceipt = receiptItem?.Value || "";
-          }
-          await supabase
-            .from("bid_fee_payments")
-            .update({ status: "completed", mpesa_receipt: mpesaReceipt })
-            .eq("checkout_request_id", CheckoutRequestID);
-        } else {
-          await supabase
-            .from("bid_fee_payments")
-            .update({ status: "failed" })
-            .eq("checkout_request_id", CheckoutRequestID);
-        }
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
+      console.error("No checkout_request_id or merchant_request_id in callback:", JSON.stringify(body));
       return new Response(JSON.stringify({ error: "Invalid callback payload" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Tuma callback handling
+    console.log(`Processing callback: lookupId=${lookupId}, status=${status}, receipt=${mpesa_receipt_number}`);
+
     if (status === "completed" || status === "success") {
-      await supabase
+      const { error } = await supabase
         .from("bid_fee_payments")
         .update({
           status: "completed",
           mpesa_receipt: mpesa_receipt_number || "",
         })
         .eq("checkout_request_id", lookupId);
+
+      if (error) {
+        console.error("Failed to update payment to completed:", error);
+      } else {
+        console.log("Payment marked as completed for:", lookupId);
+      }
     } else {
-      await supabase
+      const { error } = await supabase
         .from("bid_fee_payments")
         .update({ status: "failed" })
         .eq("checkout_request_id", lookupId);
+
+      if (error) {
+        console.error("Failed to update payment to failed:", error);
+      } else {
+        console.log("Payment marked as failed for:", lookupId);
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {
