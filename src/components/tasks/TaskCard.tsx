@@ -48,7 +48,7 @@ export const TaskCard = ({ task }: TaskCardProps) => {
   const days = daysUntilDeadline();
 
   return (
-    <Link to={`/task/${task.id}`}>
+    <Link to={`/task/${task.id}#place-bid`}>
       <Card className="h-full transition-all duration-200 hover:shadow-elevated hover:-translate-y-1 group cursor-pointer">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
