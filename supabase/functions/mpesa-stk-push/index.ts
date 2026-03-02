@@ -17,15 +17,12 @@ async function getTumaAccessToken(): Promise<string> {
   });
 
   const rawBody = await res.text();
-  console.log("Tuma auth response status:", res.status, "body:", rawBody);
-
   if (!res.ok) {
-    throw new Error(`Failed to get Tuma token: ${res.status} ${rawBody}`);
+    throw new Error(`Tuma auth failed: ${res.status} ${rawBody}`);
   }
   const data = JSON.parse(rawBody);
   const token = data?.data?.token || data?.token;
   if (!token) throw new Error(`No token in Tuma response: ${rawBody}`);
-  console.log("Tuma token obtained successfully");
   return token;
 }
 
@@ -53,7 +50,7 @@ Deno.serve(async (req) => {
     const accessToken = await getTumaAccessToken();
     const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
 
-    console.log("Sending STK push to Tuma:", { phone: formattedPhone, amount: 30, callbackUrl });
+    console.log("Sending STK push:", { phone: formattedPhone, amount: 30, callbackUrl });
 
     const stkRes = await fetch("https://api.tuma.co.ke/payment/stk-push", {
       method: "POST",
@@ -73,6 +70,9 @@ Deno.serve(async (req) => {
     console.log("Tuma STK response:", JSON.stringify(stkData));
 
     if (stkData.success) {
+      // Store checkout_request_id for callback matching
+      const checkoutId = stkData.checkout_request_id || stkData.payment_id || stkData.merchant_request_id;
+
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -80,13 +80,13 @@ Deno.serve(async (req) => {
 
       await supabase
         .from("bid_fee_payments")
-        .update({ checkout_request_id: stkData.payment_id || stkData.merchant_request_id })
+        .update({ checkout_request_id: checkoutId })
         .eq("id", payment_id);
 
       return new Response(
         JSON.stringify({
           success: true,
-          checkout_request_id: stkData.payment_id || stkData.merchant_request_id,
+          checkout_request_id: checkoutId,
           message: "STK push sent. Check your phone.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
