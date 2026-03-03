@@ -146,3 +146,48 @@ export const useUpdateBidStatus = () => {
     },
   });
 };
+
+export const useAcceptBid = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      bidId,
+      taskId,
+    }: {
+      bidId: string;
+      taskId: string;
+    }) => {
+      // 1. Accept this bid
+      const { error: bidError } = await supabase
+        .from("bids")
+        .update({ status: "accepted" as BidStatus })
+        .eq("id", bidId);
+      if (bidError) throw bidError;
+
+      // 2. Reject all other pending bids for this task
+      const { error: rejectError } = await supabase
+        .from("bids")
+        .update({ status: "rejected" as BidStatus })
+        .eq("task_id", taskId)
+        .neq("id", bidId)
+        .eq("status", "pending");
+      if (rejectError) throw rejectError;
+
+      // 3. Update task status to in_progress and set accepted_bid_id
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .update({ status: "in_progress" as any, accepted_bid_id: bidId })
+        .eq("id", taskId);
+      if (taskError) throw taskError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bids"] });
+      queryClient.invalidateQueries({ queryKey: ["my-bid"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["freelancer-active-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["freelancer-bids"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
+    },
+  });
+};
