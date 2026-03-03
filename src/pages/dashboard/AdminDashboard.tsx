@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge, TaskStatus } from "@/components/ui/status-badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   useAdminStats,
@@ -16,31 +18,36 @@ import {
   useAdminWithdrawals,
   useUpdateWithdrawalStatus,
   useUpdateTaskStatus,
+  useAdminFreelancers,
+  useAssignTask,
 } from "@/hooks/useAdmin";
 import { format } from "date-fns";
 import {
   Users,
   Briefcase,
   DollarSign,
-  AlertTriangle,
   Search,
   CheckCircle2,
   XCircle,
   UserCheck,
-  UserX,
   Loader2,
+  UserPlus,
 } from "lucide-react";
 
 const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [assignDialog, setAssignDialog] = useState<{ taskId: string; budget: number } | null>(null);
+  const [selectedFreelancer, setSelectedFreelancer] = useState("");
 
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: users = [], isLoading: usersLoading } = useAdminUsers(userRoleFilter);
   const { data: tasks = [], isLoading: tasksLoading } = useAdminTasks();
   const { data: withdrawals = [], isLoading: withdrawalsLoading } = useAdminWithdrawals();
+  const { data: freelancers = [] } = useAdminFreelancers();
   const updateWithdrawal = useUpdateWithdrawalStatus();
   const updateTask = useUpdateTaskStatus();
+  const assignTask = useAssignTask();
 
   const filteredUsers = users.filter(
     (u) =>
@@ -68,6 +75,22 @@ const AdminDashboard = () => {
     try {
       await updateTask.mutateAsync({ id, status });
       toast.success("Task cancelled");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!assignDialog || !selectedFreelancer) return;
+    try {
+      await assignTask.mutateAsync({
+        taskId: assignDialog.taskId,
+        freelancerId: selectedFreelancer,
+        amount: assignDialog.budget,
+      });
+      toast.success("Task assigned to freelancer successfully");
+      setAssignDialog(null);
+      setSelectedFreelancer("");
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -183,17 +206,29 @@ const AdminDashboard = () => {
                             <span>{format(new Date(task.created_at), "MMM d, yyyy")}</span>
                           </div>
                         </div>
-                        {task.status === "open" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                            onClick={() => handleTaskAction(task.id, "cancelled")}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Cancel
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {task.status === "open" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAssignDialog({ taskId: task.id, budget: task.budget })}
+                              >
+                                <UserPlus className="h-4 w-4 mr-1" />
+                                Assign
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                                onClick={() => handleTaskAction(task.id, "cancelled")}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Cancel
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -279,6 +314,46 @@ const AdminDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Assign Task Dialog */}
+      <Dialog open={!!assignDialog} onOpenChange={(open) => { if (!open) { setAssignDialog(null); setSelectedFreelancer(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Task to Freelancer</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Freelancer</label>
+              <Select value={selectedFreelancer} onValueChange={setSelectedFreelancer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a freelancer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {freelancers.map((f) => (
+                    <SelectItem key={f.user_id} value={f.user_id}>
+                      {f.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {assignDialog && (
+              <p className="text-sm text-muted-foreground">
+                The freelancer will be assigned at the task budget of <strong>${assignDialog.budget}</strong>.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAssignDialog(null); setSelectedFreelancer(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleAssign} disabled={!selectedFreelancer || assignTask.isPending}>
+              {assignTask.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserPlus className="h-4 w-4 mr-1" />}
+              Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
