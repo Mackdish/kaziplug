@@ -145,3 +145,69 @@ export const useUpdateTaskStatus = () => {
     },
   });
 };
+
+export const useAdminFreelancers = () => {
+  return useQuery({
+    queryKey: ["admin-freelancers-list"],
+    queryFn: async () => {
+      const { data: roles, error } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "freelancer");
+      if (error) throw error;
+
+      const userIds = roles.map((r) => r.user_id);
+      if (userIds.length === 0) return [];
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+
+      return (profiles || []).map((p) => ({
+        user_id: p.user_id,
+        full_name: p.full_name || "Unnamed Freelancer",
+      }));
+    },
+  });
+};
+
+export const useAssignTask = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, freelancerId, amount }: { taskId: string; freelancerId: string; amount: number }) => {
+      // Create a bid on behalf of the freelancer
+      const { data: bid, error: bidError } = await supabase
+        .from("bids")
+        .insert({
+          task_id: taskId,
+          freelancer_id: freelancerId,
+          amount,
+          proposal: "Assigned by admin",
+          status: "accepted",
+        })
+        .select()
+        .single();
+      if (bidError) throw bidError;
+
+      // Reject all other pending bids
+      await supabase
+        .from("bids")
+        .update({ status: "rejected" })
+        .eq("task_id", taskId)
+        .eq("status", "pending")
+        .neq("id", bid.id);
+
+      // Update task
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .update({ status: "in_progress", accepted_bid_id: bid.id })
+        .eq("id", taskId);
+      if (taskError) throw taskError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+  });
+};
