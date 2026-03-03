@@ -35,10 +35,11 @@ import {
   Loader2,
   Smartphone,
   Phone,
+  XCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTask } from "@/hooks/useTask";
-import { useBidsForTask, useMyBidForTask, useSubmitBid } from "@/hooks/useBids";
+import { useBidsForTask, useMyBidForTask, useSubmitBid, useAcceptBid, useUpdateBidStatus } from "@/hooks/useBids";
 import { useBidFeePayment, useInitiateBidFeePayment } from "@/hooks/useBidFeePayment";
 import { format } from "date-fns";
 
@@ -68,6 +69,8 @@ const TaskDetails = () => {
   const { data: myBid } = useMyBidForTask(id || "", user?.id);
   const { data: bidFeePayment, isLoading: feeLoading } = useBidFeePayment(id || "", user?.id);
   const submitBidMutation = useSubmitBid();
+  const acceptBidMutation = useAcceptBid();
+  const rejectBidMutation = useUpdateBidStatus();
   const initiateBidFee = useInitiateBidFeePayment();
 
   const form = useForm<BidFormValues>({
@@ -330,6 +333,47 @@ const TaskDetails = () => {
                             <p className="mt-3 text-sm text-muted-foreground whitespace-pre-line">
                               {bid.proposal}
                             </p>
+                            {/* Accept / Reject buttons for task owner or admin on open tasks */}
+                            {task.status === "open" && bid.status === "pending" && (isTaskOwner || role === "admin") && (
+                              <div className="flex gap-2 mt-4">
+                                <Button
+                                  size="sm"
+                                  onClick={async () => {
+                                    try {
+                                      await acceptBidMutation.mutateAsync({ bidId: bid.id, taskId: task.id });
+                                      toast.success(`Bid accepted! Task assigned to ${bid.freelancer_profile?.full_name || "freelancer"}.`);
+                                    } catch (e: any) {
+                                      toast.error(e.message || "Failed to accept bid");
+                                    }
+                                  }}
+                                  disabled={acceptBidMutation.isPending}
+                                >
+                                  {acceptBidMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                  ) : (
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                  )}
+                                  Accept Bid
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive border-destructive/30"
+                                  onClick={async () => {
+                                    try {
+                                      await rejectBidMutation.mutateAsync({ bidId: bid.id, status: "rejected" });
+                                      toast.success("Bid rejected");
+                                    } catch (e: any) {
+                                      toast.error(e.message || "Failed to reject bid");
+                                    }
+                                  }}
+                                  disabled={rejectBidMutation.isPending}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
