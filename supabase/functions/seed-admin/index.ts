@@ -13,53 +13,48 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Check if admin already exists
     const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const adminExists = existingUsers?.users?.some(
-      (u) => u.email === "macknonvulimu@gmail.com"
-    );
 
-    if (adminExists) {
-      return new Response(
-        JSON.stringify({ message: "Admin user already exists" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-      );
+    const admins = [
+      { email: "macknonvulimu@gmail.com", password: "Macknon@2025", name: "Admin User" },
+      { email: "kaziplug1@gmail.com", password: "#kaziplug9575", name: "KaziPlug Admin" },
+    ];
+
+    const results = [];
+    for (const admin of admins) {
+      const exists = existingUsers?.users?.some((u) => u.email === admin.email);
+      if (exists) {
+        results.push({ email: admin.email, status: "already exists" });
+        continue;
+      }
+
+      const { data: userData, error: createError } = await supabase.auth.admin.createUser({
+        email: admin.email,
+        password: admin.password,
+        email_confirm: true,
+        user_metadata: { full_name: admin.name, role: "admin" },
+      });
+
+      if (createError) {
+        results.push({ email: admin.email, status: "error", error: createError.message });
+      } else {
+        results.push({ email: admin.email, status: "created", user_id: userData.user?.id });
+      }
     }
 
-    // Create admin user
-    const { data: userData, error: createError } = await supabase.auth.admin.createUser({
-      email: "macknonvulimu@gmail.com",
-      password: "Macknon@2025",
-      email_confirm: true,
-      user_metadata: {
-        full_name: "Admin User",
-        role: "admin",
-      },
+    return new Response(JSON.stringify({ results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
     });
-
-    if (createError) {
-      throw createError;
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        message: "Admin user created successfully",
-        user_id: userData.user?.id 
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-    );
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
