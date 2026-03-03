@@ -69,9 +69,11 @@ Deno.serve(async (req) => {
     const stkData = await stkRes.json();
     console.log("Tuma STK response:", JSON.stringify(stkData));
 
-    if (stkData.success) {
-      // Store checkout_request_id for callback matching
-      const checkoutId = stkData.checkout_request_id || stkData.payment_id || stkData.merchant_request_id;
+    if (stkData.success || stkData.data) {
+      // Tuma nests the IDs inside stkData.data
+      const d = stkData.data || stkData;
+      const checkoutId = d.checkout_request_id || d.merchant_request_id || stkData.checkout_request_id || stkData.merchant_request_id;
+      console.log("Storing checkoutId:", checkoutId, "for payment:", payment_id);
 
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
