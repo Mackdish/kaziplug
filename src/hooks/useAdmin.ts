@@ -33,6 +33,7 @@ export interface AdminUser {
   user_id: string;
   role: "admin" | "client" | "freelancer";
   created_at: string;
+  email?: string | null;
   profile?: {
     full_name: string | null;
     phone: string | null;
@@ -59,10 +60,17 @@ export const useAdminUsers = (roleFilter?: string) => {
         .select("user_id, full_name, phone, avatar_url, bio")
         .in("user_id", userIds);
 
+      // Fetch emails via secure function
+      const { data: emails } = await supabase.rpc("get_user_emails", {
+        user_ids: userIds,
+      });
+
       const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      const emailMap = new Map((emails || []).map((e: any) => [e.user_id, e.email]));
 
       return roles.map((r: any) => ({
         ...r,
+        email: emailMap.get(r.user_id) || null,
         profile: profileMap.get(r.user_id) || null,
       })) as AdminUser[];
     },
