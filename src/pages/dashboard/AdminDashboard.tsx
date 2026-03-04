@@ -47,6 +47,8 @@ const AdminDashboard = () => {
   const { data: tasks = [], isLoading: tasksLoading } = useAdminTasks();
   const { data: withdrawals = [], isLoading: withdrawalsLoading } = useAdminWithdrawals();
   const { data: freelancers = [] } = useAdminFreelancers();
+  const freelancerUserIds = users.filter(u => u.role === "freelancer").map(u => u.user_id);
+  const { data: paymentMethods = [] } = useAdminPaymentMethods(freelancerUserIds);
   const updateWithdrawal = useUpdateWithdrawalStatus();
   const updateTask = useUpdateTaskStatus();
   const assignTask = useAssignTask();
@@ -176,7 +178,7 @@ const AdminDashboard = () => {
 
           {/* Freelancers Tab */}
           <TabsContent value="freelancers">
-            <UserList users={filteredUsers.filter(u => u.role === "freelancer")} loading={usersLoading} roleLabel="Freelancer" />
+            <UserList users={filteredUsers.filter(u => u.role === "freelancer")} loading={usersLoading} roleLabel="Freelancer" paymentMethods={paymentMethods} />
           </TabsContent>
 
           {/* Tasks Tab */}
