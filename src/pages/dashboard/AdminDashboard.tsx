@@ -54,6 +54,7 @@ const AdminDashboard = () => {
     (u) =>
       !searchQuery ||
       u.profile?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.user_id.includes(searchQuery)
   );
 
