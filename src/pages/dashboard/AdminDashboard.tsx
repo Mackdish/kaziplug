@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Mail } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -393,8 +394,14 @@ const UserList = ({
                 <div>
                   <p className="font-medium">{user.profile?.full_name || "Unnamed User"}</p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    {user.profile?.phone && <span>{user.profile.phone}</span>}
-                    <span>Joined {format(new Date(user.created_at), "MMM d, yyyy")}</span>
+                    {user.email && (
+                      <span className="flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {user.email}
+                      </span>
+                    )}
+                    {user.profile?.phone && <span>• {user.profile.phone}</span>}
+                    <span>• Joined {format(new Date(user.created_at), "MMM d, yyyy")}</span>
                   </div>
                 </div>
               </div>
