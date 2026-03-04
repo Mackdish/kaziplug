@@ -375,6 +375,8 @@ const UserList = ({
   roleLabel: string;
   paymentMethods?: PaymentMethod[];
 }) => {
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+
   const getMethodIcon = (type: string) => {
     if (type === "mpesa") return Phone;
     if (type === "paypal") return CreditCard;
@@ -386,69 +388,151 @@ const UserList = ({
     return "Bank";
   };
 
+  const selectedMethods = paymentMethods?.filter((pm) => pm.user_id === selectedUser?.user_id) || [];
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5" />
-          {roleLabel}s ({users.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-          </div>
-        ) : users.length > 0 ? (
-          <div className="space-y-3">
-            {users.map((user) => {
-              const userMethods = paymentMethods?.filter((pm) => pm.user_id === user.user_id) || [];
-              return (
-                <div key={user.id} className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {user.profile?.full_name?.[0]?.toUpperCase() || "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{user.profile?.full_name || "Unnamed User"}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {user.email && (
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {user.email}
-                          </span>
-                        )}
-                        {user.profile?.phone && <span>• {user.profile.phone}</span>}
-                        <span>• Joined {format(new Date(user.created_at), "MMM d, yyyy")}</span>
-                      </div>
-                      {userMethods.length > 0 && (
-                        <div className="flex items-center gap-2 mt-1">
-                          {userMethods.map((pm) => {
-                            const Icon = getMethodIcon(pm.method_type);
-                            const summary = Object.values(pm.details || {}).filter(Boolean).join(" • ");
-                            return (
-                              <Badge key={pm.id} variant="outline" className="text-xs gap-1">
-                                <Icon className="h-3 w-3" />
-                                {getMethodLabel(pm.method_type)}: {summary}
-                              </Badge>
-                            );
-                          })}
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            {roleLabel}s ({users.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+            </div>
+          ) : users.length > 0 ? (
+            <div className="space-y-3">
+              {users.map((user) => {
+                const userMethods = paymentMethods?.filter((pm) => pm.user_id === user.user_id) || [];
+                return (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/30 transition-colors cursor-pointer"
+                    onClick={() => setSelectedUser(user)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {user.profile?.full_name?.[0]?.toUpperCase() || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{user.profile?.full_name || "Unnamed User"}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          {user.email && (
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {user.email}
+                            </span>
+                          )}
+                          {user.profile?.phone && <span>• {user.profile.phone}</span>}
+                          <span>• Joined {format(new Date(user.created_at), "MMM d, yyyy")}</span>
                         </div>
-                      )}
+                        {userMethods.length > 0 && (
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {userMethods.map((pm) => {
+                              const Icon = getMethodIcon(pm.method_type);
+                              const summary = Object.values(pm.details || {}).filter(Boolean).join(" • ");
+                              return (
+                                <Badge key={pm.id} variant="outline" className="text-xs gap-1">
+                                  <Icon className="h-3 w-3" />
+                                  {getMethodLabel(pm.method_type)}: {summary}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <Badge variant="secondary">{user.role}</Badge>
                   </div>
-                  <Badge variant="secondary">{user.role}</Badge>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">No {roleLabel.toLowerCase()}s found.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* User Profile Dialog */}
+      <Dialog open={!!selectedUser} onOpenChange={(open) => { if (!open) setSelectedUser(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>User Profile</DialogTitle>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-6 py-2">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xl">
+                    {selectedUser.profile?.full_name?.[0]?.toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedUser.profile?.full_name || "Unnamed User"}</h3>
+                  <Badge variant="secondary" className="capitalize">{selectedUser.role}</Badge>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-center text-muted-foreground py-8">No {roleLabel.toLowerCase()}s found.</p>
-        )}
-      </CardContent>
-    </Card>
+              </div>
+
+              <div className="space-y-3">
+                {selectedUser.email && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedUser.email}</span>
+                  </div>
+                )}
+                {selectedUser.profile?.phone && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedUser.profile.phone}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>Joined {format(new Date(selectedUser.created_at), "MMMM d, yyyy")}</span>
+                </div>
+              </div>
+
+              {selectedUser.profile?.bio && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Bio</p>
+                  <p className="text-sm text-muted-foreground">{selectedUser.profile.bio}</p>
+                </div>
+              )}
+
+              {selectedMethods.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Payment Methods</p>
+                  <div className="space-y-2">
+                    {selectedMethods.map((pm) => {
+                      const Icon = getMethodIcon(pm.method_type);
+                      return (
+                        <div key={pm.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{getMethodLabel(pm.method_type)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {Object.values(pm.details || {}).filter(Boolean).join(" • ")}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
