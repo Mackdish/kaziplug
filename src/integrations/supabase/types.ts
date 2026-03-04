@@ -126,6 +126,36 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          created_at: string
+          details: Json
+          id: string
+          is_default: boolean
+          method_type: Database["public"]["Enums"]["payout_method_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          id?: string
+          is_default?: boolean
+          method_type: Database["public"]["Enums"]["payout_method_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          id?: string
+          is_default?: boolean
+          method_type?: Database["public"]["Enums"]["payout_method_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           created_at: string
@@ -408,6 +438,7 @@ export type Database = {
       bid_status: "pending" | "accepted" | "rejected" | "cancelled"
       escrow_status: "pending" | "held" | "released" | "refunded"
       payment_method: "stripe" | "mpesa"
+      payout_method_type: "mpesa" | "paypal" | "bank"
       task_status: "open" | "in_progress" | "completed" | "cancelled"
       withdrawal_status: "requested" | "processing" | "completed" | "failed"
     }
@@ -541,6 +572,7 @@ export const Constants = {
       bid_status: ["pending", "accepted", "rejected", "cancelled"],
       escrow_status: ["pending", "held", "released", "refunded"],
       payment_method: ["stripe", "mpesa"],
+      payout_method_type: ["mpesa", "paypal", "bank"],
       task_status: ["open", "in_progress", "completed", "cancelled"],
       withdrawal_status: ["requested", "processing", "completed", "failed"],
     },

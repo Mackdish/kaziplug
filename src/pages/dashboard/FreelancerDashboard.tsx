@@ -12,6 +12,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { useProfile } from "@/hooks/useProfile";
 import { useFreelancerBids, useFreelancerActiveTasks, useFreelancerCompletedTasks } from "@/hooks/useFreelancerBids";
 import { WithdrawalDialog } from "@/components/dashboard/WithdrawalDialog";
+import PaymentMethodsCard from "@/components/dashboard/PaymentMethodsCard";
 import {
   Briefcase,
   Wallet,
@@ -343,6 +344,9 @@ const FreelancerDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Payment Methods */}
+            {user && <PaymentMethodsCard userId={user.id} />}
           </div>
         </div>
       </div>
