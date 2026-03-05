@@ -46,6 +46,10 @@ const AdminDashboard = () => {
   const [assignDialog, setAssignDialog] = useState<{ taskId: string; budget: number } | null>(null);
   const [selectedFreelancer, setSelectedFreelancer] = useState("");
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editDescription, setEditDescription] = useState("");
+  const [editBudget, setEditBudget] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
 
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: users = [], isLoading: usersLoading } = useAdminUsers(userRoleFilter);
@@ -56,6 +60,7 @@ const AdminDashboard = () => {
   const { data: paymentMethods = [] } = useAdminPaymentMethods(freelancerUserIds);
   const updateWithdrawal = useUpdateWithdrawalStatus();
   const updateTask = useUpdateTaskStatus();
+  const updateTaskDetails = useUpdateTaskDetails();
   const assignTask = useAssignTask();
 
   const filteredUsers = users.filter(
