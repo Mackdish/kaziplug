@@ -42,6 +42,7 @@ const AdminDashboard = () => {
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [assignDialog, setAssignDialog] = useState<{ taskId: string; budget: number } | null>(null);
   const [selectedFreelancer, setSelectedFreelancer] = useState("");
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: users = [], isLoading: usersLoading } = useAdminUsers(userRoleFilter);
