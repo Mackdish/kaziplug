@@ -42,6 +42,7 @@ const AdminDashboard = () => {
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [assignDialog, setAssignDialog] = useState<{ taskId: string; budget: number } | null>(null);
   const [selectedFreelancer, setSelectedFreelancer] = useState("");
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: users = [], isLoading: usersLoading } = useAdminUsers(userRoleFilter);
@@ -199,8 +200,12 @@ const AdminDashboard = () => {
                 ) : filteredTasks.length > 0 ? (
                   <div className="space-y-4">
                     {filteredTasks.map((task: any) => (
-                      <div key={task.id} className="p-4 rounded-lg border hover:border-primary/30 transition-colors">
-                        <div className="flex items-center justify-between mb-3">
+                      <div
+                        key={task.id}
+                        className="p-4 rounded-lg border hover:border-primary/30 transition-colors cursor-pointer"
+                        onClick={() => setSelectedTask(task)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-1">
                               <h4 className="font-medium truncate">{task.title}</h4>
@@ -213,7 +218,7 @@ const AdminDashboard = () => {
                               <span>{format(new Date(task.created_at), "MMM d, yyyy")}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             {task.status === "open" && (
                               <>
                                 <Button
@@ -237,66 +242,6 @@ const AdminDashboard = () => {
                             )}
                           </div>
                         </div>
-
-                        {/* Bids Section */}
-                        {task.bids && task.bids.length > 0 && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                              Bids ({task.bids.length})
-                            </p>
-                            <div className="space-y-2">
-                              {task.bids.map((bid: any) => (
-                                <div
-                                  key={bid.id}
-                                  className="flex items-center justify-between p-3 rounded-md bg-muted/50"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                        {bid.freelancer_profile?.full_name?.[0]?.toUpperCase() || "?"}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <p className="text-sm font-medium">
-                                        {bid.freelancer_profile?.full_name || "Unknown Freelancer"}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground line-clamp-1">
-                                        {bid.proposal}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-sm font-semibold">${bid.amount}</span>
-                                    <Badge
-                                      variant={
-                                        bid.status === "accepted" ? "default" :
-                                        bid.status === "rejected" ? "destructive" :
-                                        "secondary"
-                                      }
-                                      className="text-xs"
-                                    >
-                                      {bid.status}
-                                    </Badge>
-                                    {task.status === "open" && bid.status === "pending" && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-7 text-xs"
-                                        onClick={() => {
-                                          setSelectedFreelancer(bid.freelancer_id);
-                                          setAssignDialog({ taskId: task.id, budget: bid.amount });
-                                        }}
-                                      >
-                                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                                        Accept
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -382,6 +327,162 @@ const AdminDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Task Detail Dialog */}
+      <Dialog open={!!selectedTask} onOpenChange={(open) => { if (!open) setSelectedTask(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <span className="truncate">{selectedTask?.title}</span>
+              {selectedTask && <StatusBadge status={selectedTask.status as TaskStatus} />}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedTask && (
+            <div className="space-y-6 py-2">
+              {/* Task Description */}
+              <div>
+                <p className="text-sm font-medium mb-1">Description</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedTask.description}</p>
+              </div>
+
+              {/* Task Meta */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Budget</p>
+                  <p className="font-semibold">${selectedTask.budget}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Category</p>
+                  <p className="font-medium">{selectedTask.category?.name || "Uncategorized"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Posted</p>
+                  <p className="font-medium">{format(new Date(selectedTask.created_at), "MMM d, yyyy")}</p>
+                </div>
+                {selectedTask.deadline && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Deadline</p>
+                    <p className="font-medium">{format(new Date(selectedTask.deadline), "MMM d, yyyy")}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Client Info */}
+              <div>
+                <p className="text-sm font-medium mb-2">Client</p>
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {selectedTask.client_profile?.full_name?.[0]?.toUpperCase() || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{selectedTask.client_profile?.full_name || "Unknown Client"}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {selectedTask.client_email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {selectedTask.client_email}
+                        </span>
+                      )}
+                      {selectedTask.client_profile?.phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {selectedTask.client_profile.phone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bids */}
+              <div>
+                <p className="text-sm font-medium mb-2">Bids ({selectedTask.bids?.length || 0})</p>
+                {selectedTask.bids && selectedTask.bids.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedTask.bids.map((bid: any) => (
+                      <div key={bid.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                              {bid.freelancer_profile?.full_name?.[0]?.toUpperCase() || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{bid.freelancer_profile?.full_name || "Unknown"}</p>
+                            {bid.freelancer_email && (
+                              <p className="text-xs text-muted-foreground">{bid.freelancer_email}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{bid.proposal}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-sm font-semibold">${bid.amount}</span>
+                          <Badge
+                            variant={
+                              bid.status === "accepted" ? "default" :
+                              bid.status === "rejected" ? "destructive" :
+                              "secondary"
+                            }
+                            className="text-xs"
+                          >
+                            {bid.status}
+                          </Badge>
+                          {selectedTask.status === "open" && bid.status === "pending" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                setSelectedFreelancer(bid.freelancer_id);
+                                setAssignDialog({ taskId: selectedTask.id, budget: bid.amount });
+                                setSelectedTask(null);
+                              }}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Accept
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No bids yet.</p>
+                )}
+              </div>
+
+              {/* Actions */}
+              {selectedTask.status === "open" && (
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setAssignDialog({ taskId: selectedTask.id, budget: selectedTask.budget });
+                      setSelectedTask(null);
+                    }}
+                  >
+                    <UserPlus className="h-4 w-4 mr-1" />
+                    Assign Freelancer
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => {
+                      handleTaskAction(selectedTask.id, "cancelled");
+                      setSelectedTask(null);
+                    }}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Cancel Task
+                  </Button>
+                </DialogFooter>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Assign Task Dialog */}
       <Dialog open={!!assignDialog} onOpenChange={(open) => { if (!open) { setAssignDialog(null); setSelectedFreelancer(""); } }}>

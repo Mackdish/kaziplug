@@ -91,29 +91,39 @@ export const useAdminTasks = () => {
         .order("created_at", { ascending: false });
       if (error) throw error;
 
-      // Collect all freelancer IDs from bids
+      // Collect all freelancer IDs from bids and client IDs
       const freelancerIds = [
         ...new Set(
           data.flatMap((t: any) => (t.bids || []).map((b: any) => b.freelancer_id))
         ),
       ];
+      const clientIds = [...new Set(data.map((t: any) => t.client_id))];
+      const allUserIds = [...new Set([...freelancerIds, ...clientIds])];
 
-      if (freelancerIds.length === 0) return data;
+      if (allUserIds.length === 0) return data;
 
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("user_id, full_name, avatar_url")
-        .in("user_id", freelancerIds);
+        .select("user_id, full_name, avatar_url, phone")
+        .in("user_id", allUserIds);
+
+      const { data: emails } = await supabase.rpc("get_user_emails", {
+        user_ids: allUserIds,
+      });
 
       const profileMap = new Map(
         (profiles || []).map((p: any) => [p.user_id, p])
       );
+      const emailMap = new Map((emails || []).map((e: any) => [e.user_id, e.email]));
 
       return data.map((task: any) => ({
         ...task,
+        client_profile: profileMap.get(task.client_id) || null,
+        client_email: emailMap.get(task.client_id) || null,
         bids: (task.bids || []).map((bid: any) => ({
           ...bid,
           freelancer_profile: profileMap.get(bid.freelancer_id) || null,
+          freelancer_email: emailMap.get(bid.freelancer_id) || null,
         })),
       }));
     },
