@@ -378,12 +378,18 @@ const AdminDashboard = () => {
       </div>
 
       {/* Task Detail Dialog */}
-      <Dialog open={!!selectedTask} onOpenChange={(open) => { if (!open) setSelectedTask(null); }}>
+      <Dialog open={!!selectedTask} onOpenChange={(open) => { if (!open) { setSelectedTask(null); setIsEditingTask(false); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <span className="truncate">{selectedTask?.title}</span>
               {selectedTask && <StatusBadge status={selectedTask.status as TaskStatus} />}
+              {selectedTask && !isEditingTask && (
+                <Button variant="ghost" size="sm" className="h-7 ml-auto" onClick={startEditingTask}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" />
+                  Edit
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
           {selectedTask && (
@@ -391,14 +397,33 @@ const AdminDashboard = () => {
               {/* Task Description */}
               <div>
                 <p className="text-sm font-medium mb-1">Description</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedTask.description}</p>
+                {isEditingTask ? (
+                  <Textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={4}
+                    className="text-sm"
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedTask.description}</p>
+                )}
               </div>
 
               {/* Task Meta */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Budget</p>
-                  <p className="font-semibold">${selectedTask.budget}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Budget</p>
+                  {isEditingTask ? (
+                    <Input
+                      type="number"
+                      value={editBudget}
+                      onChange={(e) => setEditBudget(e.target.value)}
+                      min={5}
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <p className="font-semibold">${selectedTask.budget}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Category</p>
@@ -408,13 +433,35 @@ const AdminDashboard = () => {
                   <p className="text-xs text-muted-foreground">Posted</p>
                   <p className="font-medium">{format(new Date(selectedTask.created_at), "MMM d, yyyy")}</p>
                 </div>
-                {selectedTask.deadline && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Deadline</p>
-                    <p className="font-medium">{format(new Date(selectedTask.deadline), "MMM d, yyyy")}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Deadline</p>
+                  {isEditingTask ? (
+                    <Input
+                      type="date"
+                      value={editDeadline}
+                      onChange={(e) => setEditDeadline(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {selectedTask.deadline ? format(new Date(selectedTask.deadline), "MMM d, yyyy") : "No deadline"}
+                    </p>
+                  )}
+                </div>
               </div>
+
+              {/* Save/Cancel edit buttons */}
+              {isEditingTask && (
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSaveTaskEdit} disabled={updateTaskDetails.isPending}>
+                    {updateTaskDetails.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                    Save Changes
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsEditingTask(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
 
               {/* Client Info */}
               <div>
@@ -503,7 +550,7 @@ const AdminDashboard = () => {
               </div>
 
               {/* Actions */}
-              {selectedTask.status === "open" && (
+              {selectedTask.status === "open" && !isEditingTask && (
                 <DialogFooter>
                   <Button
                     variant="outline"
