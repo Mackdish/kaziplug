@@ -111,6 +111,39 @@ const AdminDashboard = () => {
     }
   };
 
+  const startEditingTask = () => {
+    if (!selectedTask) return;
+    setEditDescription(selectedTask.description || "");
+    setEditBudget(String(selectedTask.budget || ""));
+    setEditDeadline(selectedTask.deadline ? new Date(selectedTask.deadline).toISOString().split("T")[0] : "");
+    setIsEditingTask(true);
+  };
+
+  const handleSaveTaskEdit = async () => {
+    if (!selectedTask) return;
+    try {
+      await updateTaskDetails.mutateAsync({
+        id: selectedTask.id,
+        updates: {
+          description: editDescription,
+          budget: Number(editBudget),
+          deadline: editDeadline ? new Date(editDeadline).toISOString() : null,
+        },
+      });
+      toast.success("Task updated successfully");
+      setIsEditingTask(false);
+      // Update selectedTask in state
+      setSelectedTask((prev: any) => prev ? {
+        ...prev,
+        description: editDescription,
+        budget: Number(editBudget),
+        deadline: editDeadline ? new Date(editDeadline).toISOString() : null,
+      } : null);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
   const statCards = [
     { title: "Clients", value: stats?.totalClients ?? "—", icon: UserCheck, color: "text-primary", bgColor: "bg-primary/10" },
     { title: "Freelancers", value: stats?.totalFreelancers ?? "—", icon: Users, color: "text-accent", bgColor: "bg-accent/10" },
