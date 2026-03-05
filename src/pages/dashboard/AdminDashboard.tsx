@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Mail, Phone, CreditCard, Building } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Mail, Phone, CreditCard, Building, Pencil, Save } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +21,7 @@ import {
   useAdminWithdrawals,
   useUpdateWithdrawalStatus,
   useUpdateTaskStatus,
+  useUpdateTaskDetails,
   useAdminFreelancers,
   useAssignTask,
 } from "@/hooks/useAdmin";
@@ -43,6 +46,10 @@ const AdminDashboard = () => {
   const [assignDialog, setAssignDialog] = useState<{ taskId: string; budget: number } | null>(null);
   const [selectedFreelancer, setSelectedFreelancer] = useState("");
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editDescription, setEditDescription] = useState("");
+  const [editBudget, setEditBudget] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
 
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: users = [], isLoading: usersLoading } = useAdminUsers(userRoleFilter);
@@ -53,6 +60,7 @@ const AdminDashboard = () => {
   const { data: paymentMethods = [] } = useAdminPaymentMethods(freelancerUserIds);
   const updateWithdrawal = useUpdateWithdrawalStatus();
   const updateTask = useUpdateTaskStatus();
+  const updateTaskDetails = useUpdateTaskDetails();
   const assignTask = useAssignTask();
 
   const filteredUsers = users.filter(
@@ -103,6 +111,39 @@ const AdminDashboard = () => {
     }
   };
 
+  const startEditingTask = () => {
+    if (!selectedTask) return;
+    setEditDescription(selectedTask.description || "");
+    setEditBudget(String(selectedTask.budget || ""));
+    setEditDeadline(selectedTask.deadline ? new Date(selectedTask.deadline).toISOString().split("T")[0] : "");
+    setIsEditingTask(true);
+  };
+
+  const handleSaveTaskEdit = async () => {
+    if (!selectedTask) return;
+    try {
+      await updateTaskDetails.mutateAsync({
+        id: selectedTask.id,
+        updates: {
+          description: editDescription,
+          budget: Number(editBudget),
+          deadline: editDeadline ? new Date(editDeadline).toISOString() : null,
+        },
+      });
+      toast.success("Task updated successfully");
+      setIsEditingTask(false);
+      // Update selectedTask in state
+      setSelectedTask((prev: any) => prev ? {
+        ...prev,
+        description: editDescription,
+        budget: Number(editBudget),
+        deadline: editDeadline ? new Date(editDeadline).toISOString() : null,
+      } : null);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
   const statCards = [
     { title: "Clients", value: stats?.totalClients ?? "—", icon: UserCheck, color: "text-primary", bgColor: "bg-primary/10" },
     { title: "Freelancers", value: stats?.totalFreelancers ?? "—", icon: Users, color: "text-accent", bgColor: "bg-accent/10" },
@@ -119,14 +160,22 @@ const AdminDashboard = () => {
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
             <p className="text-muted-foreground">Manage users, tasks, and platform operations</p>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users, tasks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-64"
-            />
+          <div className="flex items-center gap-3">
+            <Link to="/marketplace">
+              <Button variant="outline" className="gap-2">
+                <Briefcase className="h-4 w-4" />
+                Find Work
+              </Button>
+            </Link>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search users, tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-64"
+              />
+            </div>
           </div>
         </div>
 
@@ -329,12 +378,18 @@ const AdminDashboard = () => {
       </div>
 
       {/* Task Detail Dialog */}
-      <Dialog open={!!selectedTask} onOpenChange={(open) => { if (!open) setSelectedTask(null); }}>
+      <Dialog open={!!selectedTask} onOpenChange={(open) => { if (!open) { setSelectedTask(null); setIsEditingTask(false); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <span className="truncate">{selectedTask?.title}</span>
               {selectedTask && <StatusBadge status={selectedTask.status as TaskStatus} />}
+              {selectedTask && !isEditingTask && (
+                <Button variant="ghost" size="sm" className="h-7 ml-auto" onClick={startEditingTask}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" />
+                  Edit
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
           {selectedTask && (
@@ -342,14 +397,33 @@ const AdminDashboard = () => {
               {/* Task Description */}
               <div>
                 <p className="text-sm font-medium mb-1">Description</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedTask.description}</p>
+                {isEditingTask ? (
+                  <Textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={4}
+                    className="text-sm"
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedTask.description}</p>
+                )}
               </div>
 
               {/* Task Meta */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Budget</p>
-                  <p className="font-semibold">${selectedTask.budget}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Budget</p>
+                  {isEditingTask ? (
+                    <Input
+                      type="number"
+                      value={editBudget}
+                      onChange={(e) => setEditBudget(e.target.value)}
+                      min={5}
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <p className="font-semibold">${selectedTask.budget}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Category</p>
@@ -359,13 +433,35 @@ const AdminDashboard = () => {
                   <p className="text-xs text-muted-foreground">Posted</p>
                   <p className="font-medium">{format(new Date(selectedTask.created_at), "MMM d, yyyy")}</p>
                 </div>
-                {selectedTask.deadline && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Deadline</p>
-                    <p className="font-medium">{format(new Date(selectedTask.deadline), "MMM d, yyyy")}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Deadline</p>
+                  {isEditingTask ? (
+                    <Input
+                      type="date"
+                      value={editDeadline}
+                      onChange={(e) => setEditDeadline(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {selectedTask.deadline ? format(new Date(selectedTask.deadline), "MMM d, yyyy") : "No deadline"}
+                    </p>
+                  )}
+                </div>
               </div>
+
+              {/* Save/Cancel edit buttons */}
+              {isEditingTask && (
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSaveTaskEdit} disabled={updateTaskDetails.isPending}>
+                    {updateTaskDetails.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                    Save Changes
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsEditingTask(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
 
               {/* Client Info */}
               <div>
@@ -454,7 +550,7 @@ const AdminDashboard = () => {
               </div>
 
               {/* Actions */}
-              {selectedTask.status === "open" && (
+              {selectedTask.status === "open" && !isEditingTask && (
                 <DialogFooter>
                   <Button
                     variant="outline"
