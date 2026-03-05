@@ -189,6 +189,23 @@ export const useUpdateTaskStatus = () => {
   });
 };
 
+export const useUpdateTaskDetails = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: { description?: string; budget?: number; deadline?: string | null } }) => {
+      const { error } = await supabase
+        .from("tasks")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+  });
+};
+
 export const useAdminFreelancers = () => {
   return useQuery({
     queryKey: ["admin-freelancers-list"],

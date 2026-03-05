@@ -12,7 +12,7 @@ const Footer = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
                 <Briefcase className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold">TaskFlow</span>
+              <span className="text-xl font-bold">NextGig</span>
             </Link>
             <p className="text-background/70 text-sm leading-relaxed">
               Connect with skilled freelancers or find your next project. Secure payments, trusted escrow system.
@@ -47,15 +47,15 @@ const Footer = () => {
             <ul className="space-y-3 text-sm text-background/70">
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                support@taskflow.com
+                support@nextgig.co.ke
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                +1 (555) 123-4567
+                +254 700 000 000
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
-                San Francisco, CA
+                Nairobi, Kenya
               </li>
             </ul>
           </div>
@@ -63,7 +63,7 @@ const Footer = () => {
 
         <div className="border-t border-background/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-background/50">
-            © 2024 TaskFlow. All rights reserved.
+            © {new Date().getFullYear()} NextGig. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm text-background/50">
             <Link to="/terms" className="hover:text-background transition-colors">Terms of Service</Link>
