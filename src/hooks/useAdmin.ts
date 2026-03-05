@@ -86,11 +86,36 @@ export const useAdminTasks = () => {
         .select(`
           *,
           category:categories(name),
-          bids(id)
+          bids(id, freelancer_id, amount, status, proposal, created_at)
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+
+      // Collect all freelancer IDs from bids
+      const freelancerIds = [
+        ...new Set(
+          data.flatMap((t: any) => (t.bids || []).map((b: any) => b.freelancer_id))
+        ),
+      ];
+
+      if (freelancerIds.length === 0) return data;
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, avatar_url")
+        .in("user_id", freelancerIds);
+
+      const profileMap = new Map(
+        (profiles || []).map((p: any) => [p.user_id, p])
+      );
+
+      return data.map((task: any) => ({
+        ...task,
+        bids: (task.bids || []).map((bid: any) => ({
+          ...bid,
+          freelancer_profile: profileMap.get(bid.freelancer_id) || null,
+        })),
+      }));
     },
   });
 };
