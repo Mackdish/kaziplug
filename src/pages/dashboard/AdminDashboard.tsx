@@ -200,8 +200,12 @@ const AdminDashboard = () => {
                 ) : filteredTasks.length > 0 ? (
                   <div className="space-y-4">
                     {filteredTasks.map((task: any) => (
-                      <div key={task.id} className="p-4 rounded-lg border hover:border-primary/30 transition-colors">
-                        <div className="flex items-center justify-between mb-3">
+                      <div
+                        key={task.id}
+                        className="p-4 rounded-lg border hover:border-primary/30 transition-colors cursor-pointer"
+                        onClick={() => setSelectedTask(task)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-1">
                               <h4 className="font-medium truncate">{task.title}</h4>
@@ -214,7 +218,7 @@ const AdminDashboard = () => {
                               <span>{format(new Date(task.created_at), "MMM d, yyyy")}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             {task.status === "open" && (
                               <>
                                 <Button
@@ -238,66 +242,6 @@ const AdminDashboard = () => {
                             )}
                           </div>
                         </div>
-
-                        {/* Bids Section */}
-                        {task.bids && task.bids.length > 0 && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                              Bids ({task.bids.length})
-                            </p>
-                            <div className="space-y-2">
-                              {task.bids.map((bid: any) => (
-                                <div
-                                  key={bid.id}
-                                  className="flex items-center justify-between p-3 rounded-md bg-muted/50"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                        {bid.freelancer_profile?.full_name?.[0]?.toUpperCase() || "?"}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <p className="text-sm font-medium">
-                                        {bid.freelancer_profile?.full_name || "Unknown Freelancer"}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground line-clamp-1">
-                                        {bid.proposal}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-sm font-semibold">${bid.amount}</span>
-                                    <Badge
-                                      variant={
-                                        bid.status === "accepted" ? "default" :
-                                        bid.status === "rejected" ? "destructive" :
-                                        "secondary"
-                                      }
-                                      className="text-xs"
-                                    >
-                                      {bid.status}
-                                    </Badge>
-                                    {task.status === "open" && bid.status === "pending" && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-7 text-xs"
-                                        onClick={() => {
-                                          setSelectedFreelancer(bid.freelancer_id);
-                                          setAssignDialog({ taskId: task.id, budget: bid.amount });
-                                        }}
-                                      >
-                                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                                        Accept
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
