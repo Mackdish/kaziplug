@@ -23,6 +23,9 @@ Deno.serve(async (req) => {
     const admins = [
       { email: "macknonvulimu@gmail.com", password: "Macknon@2025", name: "Admin User" },
       { email: "kaziplug1@gmail.com", password: "#kaziplug9575", name: "KaziPlug Admin" },
+      { email: "kaziplug@nextgig.co.ke", password: "Kaziplug", name: "KaziPlug NextGig" },
+      { email: "kaziplug1@nextgig.co.ke", password: "Kaziplug1", name: "KaziPlug1 NextGig" },
+      { email: "kaziplug2@nextgig.co.ke", password: "Kaziplug2", name: "KaziPlug2 NextGig" },
     ];
 
     const results = [];
