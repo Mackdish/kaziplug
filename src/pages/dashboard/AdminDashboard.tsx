@@ -160,14 +160,22 @@ const AdminDashboard = () => {
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
             <p className="text-muted-foreground">Manage users, tasks, and platform operations</p>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users, tasks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-64"
-            />
+          <div className="flex items-center gap-3">
+            <Link to="/marketplace">
+              <Button variant="outline" className="gap-2">
+                <Briefcase className="h-4 w-4" />
+                Find Work
+              </Button>
+            </Link>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search users, tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-64"
+              />
+            </div>
           </div>
         </div>
 
