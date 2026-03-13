@@ -291,6 +291,7 @@ export type Database = {
       transactions: {
         Row: {
           amount: number
+          checkout_request_id: string | null
           created_at: string
           escrow_status: Database["public"]["Enums"]["escrow_status"]
           external_reference: string | null
@@ -304,6 +305,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          checkout_request_id?: string | null
           created_at?: string
           escrow_status?: Database["public"]["Enums"]["escrow_status"]
           external_reference?: string | null
@@ -317,6 +319,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          checkout_request_id?: string | null
           created_at?: string
           escrow_status?: Database["public"]["Enums"]["escrow_status"]
           external_reference?: string | null
