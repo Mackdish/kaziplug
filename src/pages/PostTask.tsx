@@ -163,6 +163,30 @@ const PostTask = () => {
       toast.error("You must be logged in to post a task");
       return;
     }
+
+    // Admins can post tasks without payment
+    if (isAdmin) {
+      const { error } = await supabase.from("tasks").insert({
+        client_id: user.id,
+        title: values.title.trim(),
+        description: values.description.trim(),
+        category_id: values.category_id,
+        budget: Number(values.budget),
+        deadline: new Date(values.deadline).toISOString(),
+        status: "open",
+      });
+
+      if (error) {
+        console.error("Error creating task:", error);
+        toast.error(error.message || "Failed to create task");
+        return;
+      }
+
+      toast.success("Task posted successfully!");
+      navigate("/dashboard/admin");
+      return;
+    }
+
     setPendingTaskData(values);
     setShowPaymentDialog(true);
     setPaymentStatus("idle");
