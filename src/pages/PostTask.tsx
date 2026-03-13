@@ -410,11 +410,11 @@ const PostTask = () => {
                   <div className="bg-muted rounded-lg p-4 flex gap-3">
                     <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div className="text-sm">
-                      <p className="font-medium mb-1">Payment Required</p>
+                      <p className="font-medium mb-1">{isAdmin ? "Admin Posting" : "Payment Required"}</p>
                       <p className="text-muted-foreground">
-                        You'll pay the full task budget via M-Pesa when posting. The funds
-                        will be held in escrow and released to the freelancer only after
-                        you approve the completed work.
+                        {isAdmin
+                          ? "As an admin, you can post tasks without payment."
+                          : "You'll pay the full task budget via M-Pesa when posting. The funds will be held in escrow and released to the freelancer only after you approve the completed work."}
                       </p>
                     </div>
                   </div>
