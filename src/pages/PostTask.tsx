@@ -439,7 +439,7 @@ const PostTask = () => {
                           Processing...
                         </>
                       ) : (
-                        <>Post Task & Pay via M-Pesa</>
+                        <>{isAdmin ? "Post Task" : "Post Task & Pay via M-Pesa"}</>
                       )}
                     </Button>
                   </div>
