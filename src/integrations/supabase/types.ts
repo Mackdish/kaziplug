@@ -185,9 +185,14 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          experience: string | null
           full_name: string | null
+          hourly_rate: number | null
           id: string
+          languages: string[] | null
+          location: string | null
           phone: string | null
+          portfolio_url: string | null
           skills: string[] | null
           updated_at: string
           user_id: string
@@ -196,9 +201,14 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          experience?: string | null
           full_name?: string | null
+          hourly_rate?: number | null
           id?: string
+          languages?: string[] | null
+          location?: string | null
           phone?: string | null
+          portfolio_url?: string | null
           skills?: string[] | null
           updated_at?: string
           user_id: string
@@ -207,9 +217,14 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          experience?: string | null
           full_name?: string | null
+          hourly_rate?: number | null
           id?: string
+          languages?: string[] | null
+          location?: string | null
           phone?: string | null
+          portfolio_url?: string | null
           skills?: string[] | null
           updated_at?: string
           user_id?: string
@@ -276,6 +291,7 @@ export type Database = {
       transactions: {
         Row: {
           amount: number
+          checkout_request_id: string | null
           created_at: string
           escrow_status: Database["public"]["Enums"]["escrow_status"]
           external_reference: string | null
@@ -289,6 +305,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          checkout_request_id?: string | null
           created_at?: string
           escrow_status?: Database["public"]["Enums"]["escrow_status"]
           external_reference?: string | null
@@ -302,6 +319,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          checkout_request_id?: string | null
           created_at?: string
           escrow_status?: Database["public"]["Enums"]["escrow_status"]
           external_reference?: string | null

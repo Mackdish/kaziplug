@@ -20,8 +20,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Tuma callback format:
-    // { merchant_request_id, checkout_request_id, status, message, amount, mpesa_receipt_number, transaction_date, phone_number }
     const {
       checkout_request_id,
       merchant_request_id,
@@ -41,31 +39,56 @@ Deno.serve(async (req) => {
 
     console.log(`Processing callback: lookupId=${lookupId}, status=${status}, receipt=${mpesa_receipt_number}`);
 
-    if (status === "completed" || status === "success") {
+    const isSuccess = status === "completed" || status === "success";
+
+    // Try to update bid_fee_payments first
+    const { data: bidPayment } = await supabase
+      .from("bid_fee_payments")
+      .select("id")
+      .eq("checkout_request_id", lookupId)
+      .maybeSingle();
+
+    if (bidPayment) {
       const { error } = await supabase
         .from("bid_fee_payments")
         .update({
-          status: "completed",
-          mpesa_receipt: mpesa_receipt_number || "",
+          status: isSuccess ? "completed" : "failed",
+          mpesa_receipt: isSuccess ? (mpesa_receipt_number || "") : null,
         })
         .eq("checkout_request_id", lookupId);
 
       if (error) {
-        console.error("Failed to update payment to completed:", error);
+        console.error("Failed to update bid_fee_payment:", error);
       } else {
-        console.log("Payment marked as completed for:", lookupId);
+        console.log(`Bid fee payment marked as ${isSuccess ? "completed" : "failed"} for:`, lookupId);
       }
-    } else {
+    }
+
+    // Try to update transactions (task payments)
+    const { data: transaction } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("checkout_request_id", lookupId)
+      .maybeSingle();
+
+    if (transaction) {
       const { error } = await supabase
-        .from("bid_fee_payments")
-        .update({ status: "failed" })
+        .from("transactions")
+        .update({
+          escrow_status: isSuccess ? "held" : "refunded",
+          external_reference: isSuccess ? (mpesa_receipt_number || "") : null,
+        })
         .eq("checkout_request_id", lookupId);
 
       if (error) {
-        console.error("Failed to update payment to failed:", error);
+        console.error("Failed to update transaction:", error);
       } else {
-        console.log("Payment marked as failed for:", lookupId);
+        console.log(`Transaction marked as ${isSuccess ? "held" : "refunded"} for:`, lookupId);
       }
+    }
+
+    if (!bidPayment && !transaction) {
+      console.warn("No matching payment found for checkout_request_id:", lookupId);
     }
 
     return new Response(JSON.stringify({ success: true }), {

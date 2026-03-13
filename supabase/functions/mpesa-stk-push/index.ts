@@ -32,9 +32,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { phone_number, task_id, user_id, payment_id } = await req.json();
+    const { phone_number, task_id, user_id, payment_id, amount, payment_type } = await req.json();
 
-    if (!phone_number || !task_id || !user_id || !payment_id) {
+    // payment_type: "bid_fee" (default) or "task_payment"
+    const type = payment_type || "bid_fee";
+    const payAmount = amount || 30;
+
+    if (!phone_number || !task_id || !user_id) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -50,7 +54,10 @@ Deno.serve(async (req) => {
     const accessToken = await getTumaAccessToken();
     const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
 
-    console.log("Sending STK push:", { phone: formattedPhone, amount: 30, callbackUrl });
+    const descPrefix = type === "task_payment" ? "TaskPay" : "BidFee";
+    const refId = payment_id ? payment_id.substring(0, 8) : task_id.substring(0, 8);
+
+    console.log("Sending STK push:", { phone: formattedPhone, amount: payAmount, type, callbackUrl });
 
     const stkRes = await fetch("https://api.tuma.co.ke/payment/stk-push", {
       method: "POST",
@@ -59,10 +66,10 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        amount: 30,
+        amount: payAmount,
         phone: formattedPhone,
         callback_url: callbackUrl,
-        description: `BidFee-${payment_id.substring(0, 8)}`,
+        description: `${descPrefix}-${refId}`,
       }),
     });
 
@@ -70,20 +77,28 @@ Deno.serve(async (req) => {
     console.log("Tuma STK response:", JSON.stringify(stkData));
 
     if (stkData.success || stkData.data) {
-      // Tuma nests the IDs inside stkData.data
       const d = stkData.data || stkData;
       const checkoutId = d.checkout_request_id || d.merchant_request_id || stkData.checkout_request_id || stkData.merchant_request_id;
-      console.log("Storing checkoutId:", checkoutId, "for payment:", payment_id);
+      console.log("Storing checkoutId:", checkoutId, "for type:", type);
 
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
 
-      await supabase
-        .from("bid_fee_payments")
-        .update({ checkout_request_id: checkoutId })
-        .eq("id", payment_id);
+      if (type === "task_payment" && payment_id) {
+        // Update transaction record with checkout_request_id
+        await supabase
+          .from("transactions")
+          .update({ checkout_request_id: checkoutId })
+          .eq("id", payment_id);
+      } else if (payment_id) {
+        // Update bid_fee_payments record
+        await supabase
+          .from("bid_fee_payments")
+          .update({ checkout_request_id: checkoutId })
+          .eq("id", payment_id);
+      }
 
       return new Response(
         JSON.stringify({
