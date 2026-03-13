@@ -76,7 +76,8 @@ interface Category {
 
 const PostTask = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isAdmin = role === "admin";
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -162,6 +163,30 @@ const PostTask = () => {
       toast.error("You must be logged in to post a task");
       return;
     }
+
+    // Admins can post tasks without payment
+    if (isAdmin) {
+      const { error } = await supabase.from("tasks").insert({
+        client_id: user.id,
+        title: values.title.trim(),
+        description: values.description.trim(),
+        category_id: values.category_id,
+        budget: Number(values.budget),
+        deadline: new Date(values.deadline).toISOString(),
+        status: "open",
+      });
+
+      if (error) {
+        console.error("Error creating task:", error);
+        toast.error(error.message || "Failed to create task");
+        return;
+      }
+
+      toast.success("Task posted successfully!");
+      navigate("/dashboard/admin");
+      return;
+    }
+
     setPendingTaskData(values);
     setShowPaymentDialog(true);
     setPaymentStatus("idle");
@@ -385,11 +410,11 @@ const PostTask = () => {
                   <div className="bg-muted rounded-lg p-4 flex gap-3">
                     <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div className="text-sm">
-                      <p className="font-medium mb-1">Payment Required</p>
+                      <p className="font-medium mb-1">{isAdmin ? "Admin Posting" : "Payment Required"}</p>
                       <p className="text-muted-foreground">
-                        You'll pay the full task budget via M-Pesa when posting. The funds
-                        will be held in escrow and released to the freelancer only after
-                        you approve the completed work.
+                        {isAdmin
+                          ? "As an admin, you can post tasks without payment."
+                          : "You'll pay the full task budget via M-Pesa when posting. The funds will be held in escrow and released to the freelancer only after you approve the completed work."}
                       </p>
                     </div>
                   </div>
@@ -414,7 +439,7 @@ const PostTask = () => {
                           Processing...
                         </>
                       ) : (
-                        <>Post Task & Pay via M-Pesa</>
+                        <>{isAdmin ? "Post Task" : "Post Task & Pay via M-Pesa"}</>
                       )}
                     </Button>
                   </div>
