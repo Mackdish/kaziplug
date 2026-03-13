@@ -185,9 +185,14 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          experience: string | null
           full_name: string | null
+          hourly_rate: number | null
           id: string
+          languages: string[] | null
+          location: string | null
           phone: string | null
+          portfolio_url: string | null
           skills: string[] | null
           updated_at: string
           user_id: string
@@ -196,9 +201,14 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          experience?: string | null
           full_name?: string | null
+          hourly_rate?: number | null
           id?: string
+          languages?: string[] | null
+          location?: string | null
           phone?: string | null
+          portfolio_url?: string | null
           skills?: string[] | null
           updated_at?: string
           user_id: string
@@ -207,9 +217,14 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          experience?: string | null
           full_name?: string | null
+          hourly_rate?: number | null
           id?: string
+          languages?: string[] | null
+          location?: string | null
           phone?: string | null
+          portfolio_url?: string | null
           skills?: string[] | null
           updated_at?: string
           user_id?: string
