@@ -76,7 +76,8 @@ interface Category {
 
 const PostTask = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isAdmin = role === "admin";
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
