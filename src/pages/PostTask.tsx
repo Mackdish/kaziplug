@@ -128,6 +128,37 @@ const PostTask = () => {
     fetchCategories();
   }, []);
 
+  // Fetch clients for admin dropdown
+  useEffect(() => {
+    if (!isAdmin) return;
+    setIsLoadingClients(true);
+    const fetchClients = async () => {
+      // Get all user_ids with 'client' role
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "client");
+      
+      if (roleData && roleData.length > 0) {
+        const clientIds = roleData.map((r) => r.user_id);
+        // Get profiles for these clients
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", clientIds);
+        
+        setClients(
+          (profileData || []).map((p) => ({
+            user_id: p.user_id,
+            full_name: p.full_name || "Unnamed Client",
+          }))
+        );
+      }
+      setIsLoadingClients(false);
+    };
+    fetchClients();
+  }, []);
+
   // Poll for payment completion
   useEffect(() => {
     if (!transactionId || paymentStatus !== "polling") return;
