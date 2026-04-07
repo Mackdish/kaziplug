@@ -231,6 +231,53 @@ export type Database = {
         }
         Relationships: []
       }
+      task_payments: {
+        Row: {
+          amount: number
+          checkout_request_id: string | null
+          created_at: string
+          id: string
+          mpesa_receipt: string | null
+          phone_number: string
+          status: string
+          task_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          mpesa_receipt?: string | null
+          phone_number: string
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          mpesa_receipt?: string | null
+          phone_number?: string
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_payments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           accepted_bid_id: string | null
@@ -431,6 +478,7 @@ export type Database = {
         Args: { user_ids: string[] }
         Returns: {
           email: string
+          full_name: string
           user_id: string
         }[]
       }

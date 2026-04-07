@@ -74,12 +74,20 @@ interface Category {
   icon: string;
 }
 
+interface ClientOption {
+  user_id: string;
+  full_name: string;
+}
+
 const PostTask = () => {
   const navigate = useNavigate();
   const { user, role } = useAuth();
   const isAdmin = role === "admin";
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [clients, setClients] = useState<ClientOption[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [pendingTaskData, setPendingTaskData] = useState<TaskFormValues | null>(null);
@@ -118,6 +126,37 @@ const PostTask = () => {
     };
 
     fetchCategories();
+  }, []);
+
+  // Fetch clients for admin dropdown
+  useEffect(() => {
+    if (!isAdmin) return;
+    setIsLoadingClients(true);
+    const fetchClients = async () => {
+      // Get all user_ids with 'client' role
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "client");
+      
+      if (roleData && roleData.length > 0) {
+        const clientIds = roleData.map((r) => r.user_id);
+        // Get profiles for these clients
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", clientIds);
+        
+        setClients(
+          (profileData || []).map((p) => ({
+            user_id: p.user_id,
+            full_name: p.full_name || "Unnamed Client",
+          }))
+        );
+      }
+      setIsLoadingClients(false);
+    };
+    fetchClients();
   }, []);
 
   // Poll for payment completion
@@ -166,8 +205,13 @@ const PostTask = () => {
 
     // Admins can post tasks without payment
     if (isAdmin) {
+      const clientId = selectedClientId || user.id;
+      if (!selectedClientId) {
+        toast.error("Please select a client for this task");
+        return;
+      }
       const { error } = await supabase.from("tasks").insert({
-        client_id: user.id,
+        client_id: clientId,
         title: values.title.trim(),
         description: values.description.trim(),
         category_id: values.category_id,
@@ -282,6 +326,32 @@ const PostTask = () => {
             <CardContent className="pt-6">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  {isAdmin && (
+                    <div className="space-y-2">
+                      <FormLabel>Post on behalf of Client</FormLabel>
+                      <Select onValueChange={setSelectedClientId} value={selectedClientId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {isLoadingClients ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                          ) : (
+                            clients.map((client) => (
+                              <SelectItem key={client.user_id} value={client.user_id}>
+                                {client.full_name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        Select which client this task belongs to
+                      </p>
+                    </div>
+                  )}
                   <FormField
                     control={form.control}
                     name="title"
