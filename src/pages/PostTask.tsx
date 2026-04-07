@@ -326,6 +326,32 @@ const PostTask = () => {
             <CardContent className="pt-6">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  {isAdmin && (
+                    <div className="space-y-2">
+                      <FormLabel>Post on behalf of Client</FormLabel>
+                      <Select onValueChange={setSelectedClientId} value={selectedClientId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {isLoadingClients ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                          ) : (
+                            clients.map((client) => (
+                              <SelectItem key={client.user_id} value={client.user_id}>
+                                {client.full_name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        Select which client this task belongs to
+                      </p>
+                    </div>
+                  )}
                   <FormField
                     control={form.control}
                     name="title"
