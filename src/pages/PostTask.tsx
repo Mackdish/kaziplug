@@ -205,8 +205,13 @@ const PostTask = () => {
 
     // Admins can post tasks without payment
     if (isAdmin) {
+      const clientId = selectedClientId || user.id;
+      if (!selectedClientId) {
+        toast.error("Please select a client for this task");
+        return;
+      }
       const { error } = await supabase.from("tasks").insert({
-        client_id: user.id,
+        client_id: clientId,
         title: values.title.trim(),
         description: values.description.trim(),
         category_id: values.category_id,
