@@ -74,12 +74,20 @@ interface Category {
   icon: string;
 }
 
+interface ClientOption {
+  user_id: string;
+  full_name: string;
+}
+
 const PostTask = () => {
   const navigate = useNavigate();
   const { user, role } = useAuth();
   const isAdmin = role === "admin";
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [clients, setClients] = useState<ClientOption[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [pendingTaskData, setPendingTaskData] = useState<TaskFormValues | null>(null);
