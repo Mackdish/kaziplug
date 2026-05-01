@@ -20,12 +20,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Tuma may nest payload under .data
+    const payload = body?.data ?? body;
     const {
       checkout_request_id,
       merchant_request_id,
       status,
       mpesa_receipt_number,
-    } = body;
+      result_code,
+      ResultCode,
+    } = payload;
 
     const lookupId = checkout_request_id || merchant_request_id;
 
@@ -37,9 +41,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`Processing callback: lookupId=${lookupId}, status=${status}, receipt=${mpesa_receipt_number}`);
+    const normalizedStatus = String(status ?? "").toLowerCase();
+    const code = result_code ?? ResultCode;
+    // Treat as success if status indicates success OR M-Pesa ResultCode is 0 OR a receipt was issued
+    const isSuccess =
+      ["completed", "success", "successful", "paid"].includes(normalizedStatus) ||
+      code === 0 ||
+      code === "0" ||
+      Boolean(mpesa_receipt_number);
 
-    const isSuccess = status === "completed" || status === "success";
+    console.log(`Processing callback: lookupId=${lookupId}, status=${status}, code=${code}, receipt=${mpesa_receipt_number}, isSuccess=${isSuccess}`);
 
     // Try to update bid_fee_payments first
     const { data: bidPayment } = await supabase
