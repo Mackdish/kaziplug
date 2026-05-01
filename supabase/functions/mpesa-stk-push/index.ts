@@ -81,6 +81,14 @@ Deno.serve(async (req) => {
       const checkoutId = d.checkout_request_id || d.merchant_request_id || stkData.checkout_request_id || stkData.merchant_request_id;
       console.log("Storing checkoutId:", checkoutId, "for type:", type);
 
+      if (!checkoutId) {
+        console.error("Tuma returned success but no checkout_request_id:", JSON.stringify(stkData));
+        return new Response(
+          JSON.stringify({ error: "Payment provider did not return a checkout reference. Please try again.", details: stkData }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!

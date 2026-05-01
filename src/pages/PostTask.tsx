@@ -163,7 +163,10 @@ const PostTask = () => {
   useEffect(() => {
     if (!transactionId || paymentStatus !== "polling") return;
 
+    let settled = false;
+
     const interval = setInterval(async () => {
+      if (settled) return;
       const { data } = await supabase
         .from("transactions")
         .select("escrow_status")
@@ -171,27 +174,32 @@ const PostTask = () => {
         .single();
 
       if (data?.escrow_status === "held") {
-        setPaymentStatus("success");
+        settled = true;
         clearInterval(interval);
+        clearTimeout(timeout);
+        setPaymentStatus("success");
         toast.success("Payment received! Task posted successfully.");
         setTimeout(() => navigate("/dashboard/client"), 2000);
       } else if (data?.escrow_status === "refunded") {
-        setPaymentStatus("failed");
+        settled = true;
         clearInterval(interval);
+        clearTimeout(timeout);
+        setPaymentStatus("failed");
         toast.error("Payment failed. Please try again.");
       }
     }, 3000);
 
-    // Stop polling after 2 minutes
+    // Stop polling after 2 minutes (only fires if not already settled)
     const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       clearInterval(interval);
-      if (paymentStatus === "polling") {
-        setPaymentStatus("failed");
-        toast.error("Payment timed out. Check your M-Pesa and try again.");
-      }
+      setPaymentStatus("failed");
+      toast.error("Payment timed out. Check your M-Pesa and try again.");
     }, 120000);
 
     return () => {
+      settled = true;
       clearInterval(interval);
       clearTimeout(timeout);
     };
