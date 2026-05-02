@@ -46,21 +46,22 @@ export const useAdminUsers = (roleFilter?: string) => {
   return useQuery({
     queryKey: ["admin-users", roleFilter],
     queryFn: async () => {
-      let query = supabase.from("user_roles").select("*");
+      let query = supabase.from("user_roles").select("*").limit(10000);
       if (roleFilter && roleFilter !== "all") {
         query = query.eq("role", roleFilter as "admin" | "client" | "freelancer");
       }
       const { data: roles, error } = await query.order("created_at", { ascending: false });
       if (error) throw error;
 
-      // Fetch profiles for these users
       const userIds = roles.map((r: any) => r.user_id);
+      if (userIds.length === 0) return [];
+
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, full_name, phone, avatar_url, bio")
-        .in("user_id", userIds);
+        .in("user_id", userIds)
+        .limit(10000);
 
-      // Fetch emails via secure function
       const { data: emails } = await supabase.rpc("get_user_emails", {
         user_ids: userIds,
       });
@@ -88,7 +89,8 @@ export const useAdminTasks = () => {
           category:categories(name),
           bids(id, freelancer_id, amount, status, proposal, created_at)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10000);
       if (error) throw error;
 
       // Collect all freelancer IDs from bids and client IDs
