@@ -167,7 +167,7 @@ const FreelancerDashboard = () => {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5" />
-                  Active Projects
+                  Assigned Tasks
                 </CardTitle>
                 <Badge variant="secondary">{activeTasks?.length || 0}</Badge>
               </CardHeader>
