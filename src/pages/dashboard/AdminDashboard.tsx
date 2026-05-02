@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { Mail, Phone, CreditCard, Building, Pencil, Save } from "lucide-react";
+import { Mail, Phone, CreditCard, Building, Pencil, Save, FileText } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,7 @@ import {
   useUpdateTaskDetails,
   useAdminFreelancers,
   useAssignTask,
+  useAdminBids,
 } from "@/hooks/useAdmin";
 import { format } from "date-fns";
 import { useAdminPaymentMethods, PaymentMethod } from "@/hooks/usePaymentMethods";
@@ -56,12 +59,39 @@ const AdminDashboard = () => {
   const { data: tasks = [], isLoading: tasksLoading } = useAdminTasks();
   const { data: withdrawals = [], isLoading: withdrawalsLoading } = useAdminWithdrawals();
   const { data: freelancers = [] } = useAdminFreelancers();
+  const { data: allBids = [], isLoading: bidsLoading } = useAdminBids();
   const freelancerUserIds = users.filter(u => u.role === "freelancer").map(u => u.user_id);
   const { data: paymentMethods = [] } = useAdminPaymentMethods(freelancerUserIds);
   const updateWithdrawal = useUpdateWithdrawalStatus();
   const updateTask = useUpdateTaskStatus();
   const updateTaskDetails = useUpdateTaskDetails();
   const assignTask = useAssignTask();
+  const queryClient = useQueryClient();
+
+  // Realtime: refetch admin lists when underlying tables change
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-dashboard")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bids" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-bids"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_roles" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "withdrawals" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const filteredUsers = users.filter(
     (u) =>
@@ -216,6 +246,10 @@ const AdminDashboard = () => {
               <Briefcase className="h-4 w-4" />
               Tasks
             </TabsTrigger>
+            <TabsTrigger value="bids" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Bids
+            </TabsTrigger>
             <TabsTrigger value="withdrawals" className="gap-2">
               <DollarSign className="h-4 w-4" />
               Withdrawals
@@ -296,6 +330,69 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   <p className="text-center text-muted-foreground py-8">No tasks found.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Bids Tab */}
+          <TabsContent value="bids">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  All Bids ({allBids.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bidsLoading ? (
+                  <div className="space-y-4">
+                    {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                  </div>
+                ) : allBids.length > 0 ? (
+                  <div className="space-y-3">
+                    {allBids.map((bid: any) => (
+                      <div key={bid.id} className="flex items-center justify-between p-4 rounded-lg border">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-primary/10 text-primary">
+                              {bid.freelancer_profile?.full_name?.[0]?.toUpperCase() || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium">{bid.freelancer_profile?.full_name || "Unknown freelancer"}</p>
+                              <Badge
+                                variant={
+                                  bid.status === "accepted" ? "default" :
+                                  bid.status === "rejected" ? "destructive" :
+                                  "secondary"
+                                }
+                                className="capitalize text-xs"
+                              >
+                                {bid.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">
+                              on "{bid.task?.title || "Unknown task"}"
+                              {bid.client_profile?.full_name && ` · client: ${bid.client_profile.full_name}`}
+                            </p>
+                            {bid.proposal && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{bid.proposal}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right ml-4 shrink-0">
+                          <div className="font-bold text-accent">${bid.amount}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(new Date(bid.created_at), "MMM d, yyyy")}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No bids yet.</p>
                 )}
               </CardContent>
             </Card>
