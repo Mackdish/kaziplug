@@ -270,6 +270,45 @@ export const useAssignTask = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-bids"] });
+    },
+  });
+};
+
+export const useAdminBids = () => {
+  return useQuery({
+    queryKey: ["admin-bids"],
+    queryFn: async () => {
+      const { data: bids, error } = await supabase
+        .from("bids")
+        .select("*, task:tasks(id, title, budget, status, client_id)")
+        .order("created_at", { ascending: false })
+        .limit(10000);
+      if (error) throw error;
+
+      const freelancerIds = [...new Set((bids || []).map((b: any) => b.freelancer_id))];
+      const clientIds = [...new Set((bids || []).map((b: any) => b.task?.client_id).filter(Boolean))];
+      const allIds = [...new Set([...freelancerIds, ...clientIds])];
+
+      if (allIds.length === 0) return bids;
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, avatar_url")
+        .in("user_id", allIds)
+        .limit(10000);
+
+      const { data: emails } = await supabase.rpc("get_user_emails", { user_ids: allIds });
+
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      const emailMap = new Map((emails || []).map((e: any) => [e.user_id, e.email]));
+
+      return (bids || []).map((b: any) => ({
+        ...b,
+        freelancer_profile: profileMap.get(b.freelancer_id) || null,
+        freelancer_email: emailMap.get(b.freelancer_id) || null,
+        client_profile: b.task?.client_id ? profileMap.get(b.task.client_id) || null : null,
+      }));
     },
   });
 };
