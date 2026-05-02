@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Mail, Phone, CreditCard, Building, Pencil, Save } from "lucide-react";
 import Header from "@/components/layout/Header";
@@ -24,6 +26,7 @@ import {
   useUpdateTaskDetails,
   useAdminFreelancers,
   useAssignTask,
+  useAdminBids,
 } from "@/hooks/useAdmin";
 import { format } from "date-fns";
 import { useAdminPaymentMethods, PaymentMethod } from "@/hooks/usePaymentMethods";
