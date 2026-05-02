@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,23 +37,46 @@ const FreelancerDashboard = () => {
   const { data: bids, isLoading: bidsLoading } = useFreelancerBids(user?.id);
   const { data: activeTasks, isLoading: activeTasksLoading } = useFreelancerActiveTasks(user?.id);
   const { data: completedTasks } = useFreelancerCompletedTasks(user?.id);
+  const queryClient = useQueryClient();
+
+  // Realtime sync: refetch when bids/tasks affecting this freelancer change
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`freelancer-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bids", filter: `freelancer_id=eq.${user.id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["freelancer-bids", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["freelancer-active-tasks", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["freelancer-completed-tasks", user.id] });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "tasks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["freelancer-active-tasks", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["freelancer-completed-tasks", user.id] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
 
   const pendingBids = bids?.filter(b => b.status === "pending") || [];
+  const totalEarnings = (completedTasks || []).reduce(
+    (sum, t: any) => sum + Number(t.completed_amount || 0),
+    0
+  );
 
   const stats = [
     {
-      title: "Available Balance",
-      value: walletLoading ? null : `$${(wallet?.available_balance || 0).toLocaleString()}`,
-      icon: Wallet,
-      color: "text-accent",
-      bgColor: "bg-accent/10",
+      title: "Total Bids",
+      value: bidsLoading ? null : bids?.length || 0,
+      icon: FileText,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
-      title: "Pending Balance",
-      value: walletLoading ? null : `$${(wallet?.pending_balance || 0).toLocaleString()}`,
-      icon: Clock,
-      color: "text-warning",
-      bgColor: "bg-warning/10",
+      title: "Active Tasks",
+      value: activeTasksLoading ? null : activeTasks?.length || 0,
+      icon: Briefcase,
+      color: "text-accent",
+      bgColor: "bg-accent/10",
     },
     {
       title: "Completed Jobs",
@@ -61,11 +86,11 @@ const FreelancerDashboard = () => {
       bgColor: "bg-primary/10",
     },
     {
-      title: "Pending Bids",
-      value: pendingBids.length,
-      icon: FileText,
-      color: "text-warning",
-      bgColor: "bg-warning/10",
+      title: "Earnings to Date",
+      value: walletLoading ? null : `$${totalEarnings.toLocaleString()}`,
+      icon: DollarSign,
+      color: "text-accent",
+      bgColor: "bg-accent/10",
     },
   ];
 
@@ -142,7 +167,7 @@ const FreelancerDashboard = () => {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5" />
-                  Active Projects
+                  Assigned Tasks
                 </CardTitle>
                 <Badge variant="secondary">{activeTasks?.length || 0}</Badge>
               </CardHeader>

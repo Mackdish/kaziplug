@@ -140,15 +140,12 @@ export const useClientStats = (userId: string | undefined) => {
     queryFn: async () => {
       if (!userId) return null;
 
-      // Get transactions where this user is the payer
       const { data: transactions, error } = await supabase
         .from("transactions")
         .select("amount, escrow_status")
         .eq("payer_id", userId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       const totalSpent = transactions
         ?.filter(t => t.escrow_status === "released")
@@ -158,10 +155,23 @@ export const useClientStats = (userId: string | undefined) => {
         ?.filter(t => t.escrow_status === "held")
         .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
 
-      return {
-        totalSpent,
-        inEscrow
-      };
+      // Hired freelancers: distinct accepted bids on this client's tasks
+      const { data: clientTasks } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("client_id", userId);
+      const taskIds = (clientTasks || []).map(t => t.id);
+      let hiredFreelancers = 0;
+      if (taskIds.length > 0) {
+        const { data: acceptedBids } = await supabase
+          .from("bids")
+          .select("freelancer_id")
+          .in("task_id", taskIds)
+          .eq("status", "accepted");
+        hiredFreelancers = new Set((acceptedBids || []).map(b => b.freelancer_id)).size;
+      }
+
+      return { totalSpent, inEscrow, hiredFreelancers };
     },
     enabled: !!userId,
   });

@@ -89,15 +89,16 @@ const Index = () => {
               trusted escrow, and quality guaranteed.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: "0.2s" }}>
-              <Link to="/register?role=client">
-                <Button size="lg" className="w-full sm:w-auto bg-card text-foreground hover:bg-card/90 gap-2">
+              <Link to="/post-task">
+                <Button size="lg" className="w-full sm:w-auto bg-card text-foreground hover:bg-card/90 gap-2 shadow-lg">
                   Post a Task
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link to="/register?role=freelancer">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 gap-2">
+              <Link to="/marketplace">
+                <Button size="lg" className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90 gap-2 shadow-lg">
                   Find Work
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
             </div>
@@ -238,12 +239,12 @@ const Index = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/register">
-                <Button size="lg" className="w-full sm:w-auto bg-card text-foreground hover:bg-card/90">
+                <Button size="lg" className="w-full sm:w-auto bg-card text-foreground hover:bg-card/90 shadow-lg">
                   Create Free Account
                 </Button>
               </Link>
               <Link to="/marketplace">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
+                <Button size="lg" className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg">
                   Browse Tasks
                 </Button>
               </Link>
