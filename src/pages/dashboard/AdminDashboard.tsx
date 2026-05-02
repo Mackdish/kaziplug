@@ -59,12 +59,39 @@ const AdminDashboard = () => {
   const { data: tasks = [], isLoading: tasksLoading } = useAdminTasks();
   const { data: withdrawals = [], isLoading: withdrawalsLoading } = useAdminWithdrawals();
   const { data: freelancers = [] } = useAdminFreelancers();
+  const { data: allBids = [], isLoading: bidsLoading } = useAdminBids();
   const freelancerUserIds = users.filter(u => u.role === "freelancer").map(u => u.user_id);
   const { data: paymentMethods = [] } = useAdminPaymentMethods(freelancerUserIds);
   const updateWithdrawal = useUpdateWithdrawalStatus();
   const updateTask = useUpdateTaskStatus();
   const updateTaskDetails = useUpdateTaskDetails();
   const assignTask = useAssignTask();
+  const queryClient = useQueryClient();
+
+  // Realtime: refetch admin lists when underlying tables change
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-dashboard")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bids" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-bids"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_roles" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "withdrawals" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const filteredUsers = users.filter(
     (u) =>
