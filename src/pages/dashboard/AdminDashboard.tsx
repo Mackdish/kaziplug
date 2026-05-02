@@ -246,6 +246,10 @@ const AdminDashboard = () => {
               <Briefcase className="h-4 w-4" />
               Tasks
             </TabsTrigger>
+            <TabsTrigger value="bids" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Bids
+            </TabsTrigger>
             <TabsTrigger value="withdrawals" className="gap-2">
               <DollarSign className="h-4 w-4" />
               Withdrawals
@@ -326,6 +330,69 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   <p className="text-center text-muted-foreground py-8">No tasks found.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Bids Tab */}
+          <TabsContent value="bids">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  All Bids ({allBids.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bidsLoading ? (
+                  <div className="space-y-4">
+                    {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                  </div>
+                ) : allBids.length > 0 ? (
+                  <div className="space-y-3">
+                    {allBids.map((bid: any) => (
+                      <div key={bid.id} className="flex items-center justify-between p-4 rounded-lg border">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-primary/10 text-primary">
+                              {bid.freelancer_profile?.full_name?.[0]?.toUpperCase() || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium">{bid.freelancer_profile?.full_name || "Unknown freelancer"}</p>
+                              <Badge
+                                variant={
+                                  bid.status === "accepted" ? "default" :
+                                  bid.status === "rejected" ? "destructive" :
+                                  "secondary"
+                                }
+                                className="capitalize text-xs"
+                              >
+                                {bid.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">
+                              on "{bid.task?.title || "Unknown task"}"
+                              {bid.client_profile?.full_name && ` · client: ${bid.client_profile.full_name}`}
+                            </p>
+                            {bid.proposal && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{bid.proposal}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right ml-4 shrink-0">
+                          <div className="font-bold text-accent">${bid.amount}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(new Date(bid.created_at), "MMM d, yyyy")}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No bids yet.</p>
                 )}
               </CardContent>
             </Card>
