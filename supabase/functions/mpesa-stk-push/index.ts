@@ -7,8 +7,16 @@ const corsHeaders = {
 };
 
 async function getTumaAccessToken(): Promise<string> {
-  const email = Deno.env.get("TUMA_EMAIL")!;
-  const apiKey = Deno.env.get("TUMA_API_KEY")!;
+  const email = (Deno.env.get("TUMA_EMAIL") || Deno.env.get("TUMA_PASSWORD") || "").trim();
+  const apiKey = (Deno.env.get("TUMA_API_KEY") || "").trim();
+
+  if (!apiKey) {
+    throw new Error("Tuma API key is not configured. Please save it as TUMA_API_KEY in backend secrets.");
+  }
+
+  if (!email || !email.includes("@")) {
+    throw new Error("Tuma business email is not configured. Please save your Tuma business email as TUMA_EMAIL in backend secrets.");
+  }
 
   const res = await fetch("https://api.tuma.co.ke/auth/token", {
     method: "POST",
@@ -18,7 +26,8 @@ async function getTumaAccessToken(): Promise<string> {
 
   const rawBody = await res.text();
   if (!res.ok) {
-    throw new Error(`Tuma auth failed: ${res.status} ${rawBody}`);
+    console.error(`Tuma auth failed: ${res.status} ${rawBody}`);
+    throw new Error("Tuma rejected the business email/API key. Please confirm TUMA_EMAIL and TUMA_API_KEY match the same Tuma business profile.");
   }
   const data = JSON.parse(rawBody);
   const token = data?.data?.token || data?.token;
@@ -73,10 +82,16 @@ Deno.serve(async (req) => {
       }),
     });
 
-    const stkData = await stkRes.json();
+    const stkRawBody = await stkRes.text();
+    let stkData: any;
+    try {
+      stkData = JSON.parse(stkRawBody);
+    } catch (_) {
+      stkData = { success: false, message: stkRawBody || "Invalid payment provider response" };
+    }
     console.log("Tuma STK response:", JSON.stringify(stkData));
 
-    if (stkData.success || stkData.data) {
+    if (stkRes.ok && (stkData.success || stkData.data)) {
       const d = stkData.data || stkData;
       const checkoutId = d.checkout_request_id || d.merchant_request_id || stkData.checkout_request_id || stkData.merchant_request_id;
       console.log("Storing checkoutId:", checkoutId, "for type:", type);
@@ -119,14 +134,14 @@ Deno.serve(async (req) => {
     } else {
       return new Response(
         JSON.stringify({ error: stkData.message || "STK push failed", details: stkData }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: stkRes.status >= 400 ? stkRes.status : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
   } catch (error) {
     console.error("STK push error:", error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
