@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getFunctionErrorMessage } from "@/lib/functionError";
 
 export interface BidFeePayment {
   id: string;
@@ -79,7 +80,7 @@ export const useInitiateBidFeePayment = () => {
         }
       );
 
-      if (stkError) throw stkError;
+      if (stkError) throw new Error(await getFunctionErrorMessage(stkError));
       if (stkResult?.error) throw new Error(stkResult.error);
 
       return { payment, stkResult };

@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { ArrowLeft, DollarSign, Calendar, Info, Loader2, Phone, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getFunctionErrorMessage } from "@/lib/functionError";
 
 const USD_TO_KES_RATE = 130;
 
@@ -297,14 +298,14 @@ const PostTask = () => {
         }
       );
 
-      if (stkError) throw stkError;
+      if (stkError) throw new Error(await getFunctionErrorMessage(stkError));
       if (stkResult?.error) throw new Error(stkResult.error);
 
       setPaymentStatus("polling");
       toast.info("STK push sent! Check your phone to complete payment.");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Payment error:", error);
-      toast.error(error.message || "Payment failed. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Payment failed. Please try again.");
       setPaymentStatus("failed");
     } finally {
       setIsProcessingPayment(false);
