@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Calendar, DollarSign, User } from "lucide-react";
+import { Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { TaskWithCategory } from "@/hooks/useTasks";
+import { formatCurrency } from "@/lib/utils";
 
 interface MarketplaceTaskCardProps {
   task: TaskWithCategory;
@@ -33,9 +34,8 @@ const MarketplaceTaskCard = ({ task }: MarketplaceTaskCardProps) => {
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <DollarSign className="h-4 w-4" />
               <span className="font-medium text-foreground">
-                ${task.budget.toLocaleString()}
+                {formatCurrency(task.budget)}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
