@@ -24,6 +24,27 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
+async function requestPayza(url: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(url, init);
+      if (!RETRYABLE_STATUSES.has(response.status) || attempt === 2) return response;
+      await response.body?.cancel();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) throw error;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("PayzaAPI request failed.");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -70,7 +91,7 @@ Deno.serve(async (req) => {
     ).slice(0, 100);
 
     const baseUrl = (Deno.env.get("PAYZA_BASE_URL") || "https://payzaapi.co.ke").replace(/\/$/, "");
-    const response = await fetch(`${baseUrl}/api/v1/pay`, {
+    const response = await requestPayza(`${baseUrl}/api/v1/pay`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -106,14 +127,16 @@ Deno.serve(async (req) => {
     let data: any;
     try { data = JSON.parse(raw); } catch { data = { success: false, message: raw || "Invalid PayzaAPI response" }; }
 
-    console.log("PayzaAPI response:", JSON.stringify(data));
+    console.log("PayzaAPI response status:", response.status, "success:", Boolean(data?.success));
 
     if (!response.ok || !data?.success) {
+      const providerUnavailable = RETRYABLE_STATUSES.has(response.status) || raw.trimStart().startsWith("<!DOCTYPE html");
       return new Response(JSON.stringify({
-        error: data?.message || data?.error || `PayzaAPI request failed with status ${response.status}`,
-        details: data,
+        error: providerUnavailable
+          ? "M-Pesa payment service is temporarily unavailable. Please try again in a few minutes."
+          : data?.message || data?.error || `Payment request failed with status ${response.status}`,
       }), {
-        status: response.status >= 400 ? response.status : 502,
+        status: providerUnavailable ? 503 : (response.status >= 400 ? response.status : 502),
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
