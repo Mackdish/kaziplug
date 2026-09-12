@@ -46,13 +46,25 @@ Deno.serve(async (req) => {
       throw new Error("PayzaAPI credentials are not configured. Add PAYZA_PUBLIC_KEY and PAYZA_SECRET_KEY to Supabase secrets.");
     }
 
-    const formattedPhone = formatKenyanPhone(phone_number);
     const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
-    if (!supabaseUrl) throw new Error("SUPABASE_URL is not configured.");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase server credentials are not configured.");
 
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const { data: authUser, error: authUserError } = await supabase.auth.admin.getUserById(user_id);
+    if (authUserError || !authUser?.user?.email) {
+      throw new Error("The customer's verified email address could not be found.");
+    }
+
+    const formattedPhone = formatKenyanPhone(phone_number);
     const callbackUrl = `${supabaseUrl}/functions/v1/mpesa-callback`;
     const referencePrefix = type === "task_payment" ? "KAZI-TASK" : "KAZI-BID";
     const reference = `${referencePrefix}-${payment_id || task_id}-${Date.now()}`.slice(0, 64);
+    const customerName = String(
+      authUser.user.user_metadata?.full_name ||
+      authUser.user.user_metadata?.name ||
+      "Kaziplug Customer"
+    ).slice(0, 100);
 
     const response = await fetch("https://payzaapi.co.ke/api/v1/pay", {
       method: "POST",
@@ -68,8 +80,8 @@ Deno.serve(async (req) => {
         reference,
         customer: {
           phone: formattedPhone,
-          name: "Kaziplug Customer",
-          email: `${user_id}@kaziplug.local`,
+          name: customerName,
+          email: authUser.user.email,
         },
         callback_url: callbackUrl,
         description: (type === "task_payment" ? "Kaziplug task payment" : "Kaziplug bid fee").slice(0, 100),
@@ -94,7 +106,6 @@ Deno.serve(async (req) => {
     }
 
     const providerReference = String(data?.data?.reference || data?.reference || reference);
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     if (type === "task_payment" && payment_id) {
       const { error } = await supabase.from("transactions")
