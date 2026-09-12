@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge, TaskStatus } from "@/components/ui/status-badge";
-import { Calendar, DollarSign, User, Clock } from "lucide-react";
+import { Calendar, User, Clock } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 export interface Task {
   id: string;
@@ -22,14 +23,6 @@ interface TaskCardProps {
 }
 
 export const TaskCard = ({ task }: TaskCardProps) => {
-  const formatBudget = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
@@ -76,8 +69,7 @@ export const TaskCard = ({ task }: TaskCardProps) => {
 
         <CardFooter className="pt-3 border-t flex items-center justify-between">
           <div className="flex items-center gap-1 text-lg font-bold text-accent">
-            <DollarSign className="h-4 w-4" />
-            {formatBudget(task.budget)}
+            {formatCurrency(task.budget)}
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
