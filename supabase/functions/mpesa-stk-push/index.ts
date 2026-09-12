@@ -6,6 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const NEXTGIG_SUCCESS_URL = "https://nextgig.co.ke/payment/success";
+const NEXTGIG_CANCEL_URL = "https://nextgig.co.ke/payment/cancelled";
+
 function formatKenyanPhone(phoneNumber: string): string {
   let phone = phoneNumber.trim().replace(/\s+/g, "");
   if (phone.startsWith("+")) phone = phone.slice(1);
@@ -84,8 +87,17 @@ Deno.serve(async (req) => {
           email: authUser.user.email,
         },
         callback_url: callbackUrl,
-        description: (type === "task_payment" ? "Kaziplug task payment" : "Kaziplug bid fee").slice(0, 100),
-        metadata: { user_id, task_id, payment_id: payment_id || null, payment_type: type, reference },
+        redirect_url: NEXTGIG_SUCCESS_URL,
+        cancel_url: NEXTGIG_CANCEL_URL,
+        description: (type === "task_payment" ? "NextGig task payment" : "NextGig bid fee").slice(0, 100),
+        metadata: {
+          user_id,
+          task_id,
+          payment_id: payment_id || null,
+          payment_type: type,
+          reference,
+          platform: "nextgig.co.ke",
+        },
       }),
     });
 
@@ -124,6 +136,8 @@ Deno.serve(async (req) => {
       payment_url: data?.data?.payment_url || data?.payment_url || null,
       status: data?.data?.status || data?.status || "pending",
       stk_sent: Boolean(data?.data?.stk_sent),
+      redirect_url: NEXTGIG_SUCCESS_URL,
+      cancel_url: NEXTGIG_CANCEL_URL,
       message: data?.message || "STK push sent. Check your phone.",
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
