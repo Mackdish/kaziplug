@@ -69,7 +69,8 @@ Deno.serve(async (req) => {
       "Kaziplug Customer"
     ).slice(0, 100);
 
-    const response = await fetch("https://payzaapi.co.ke/api/v1/pay", {
+    const baseUrl = (Deno.env.get("PAYZA_BASE_URL") || "https://payzaapi.co.ke").replace(/\/$/, "");
+    const response = await fetch(`${baseUrl}/api/v1/pay`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
