@@ -4,6 +4,8 @@ import { Database } from "@/integrations/supabase/types";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 
+const TASK_PAGE_SIZE = 40;
+
 export interface TaskWithCategory {
   id: string;
   title: string;
@@ -32,10 +34,20 @@ export const useTasks = (status?: TaskStatus) => {
       let query = supabase
         .from("tasks")
         .select(`
-          *,
+          id,
+          title,
+          description,
+          budget,
+          deadline,
+          status,
+          client_id,
+          category_id,
+          created_at,
+          updated_at,
           category:categories(id, name)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(TASK_PAGE_SIZE);
 
       if (status) {
         query = query.eq("status", status);
@@ -47,20 +59,29 @@ export const useTasks = (status?: TaskStatus) => {
         throw error;
       }
 
-      // Fetch client profiles separately since there's no direct FK
-      const clientIds = [...new Set(tasks?.map(t => t.client_id) || [])];
+      if (!tasks?.length) {
+        return [] as TaskWithCategory[];
+      }
+
+      // Profiles are fetched only for the visible tasks instead of every task.
+      const clientIds = [...new Set(tasks.map((task) => task.client_id))];
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, full_name, avatar_url")
         .in("user_id", clientIds);
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+      const profileMap = new Map(
+        profiles?.map((profile) => [profile.user_id, profile]) || []
+      );
 
-      return (tasks || []).map(task => ({
+      return tasks.map((task) => ({
         ...task,
-        client_profile: profileMap.get(task.client_id) || null
+        client_profile: profileMap.get(task.client_id) || null,
       })) as TaskWithCategory[];
     },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -70,7 +91,7 @@ export const useCategories = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("*")
+        .select("id, name, icon")
         .order("name");
 
       if (error) {
@@ -79,5 +100,8 @@ export const useCategories = () => {
 
       return data;
     },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 };
