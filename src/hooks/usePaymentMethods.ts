@@ -94,16 +94,25 @@ export const useDeletePaymentMethod = () => {
 
 // Admin: fetch payment methods for multiple users
 export const useAdminPaymentMethods = (userIds: string[]) => {
+  const ids = [...new Set(userIds)].sort();
   return useQuery({
-    queryKey: ["admin-payment-methods", userIds],
-    enabled: userIds.length > 0,
+    queryKey: ["admin-payment-methods", ids.length],
+    enabled: ids.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payment_methods" as any)
-        .select("*")
-        .in("user_id", userIds);
-      if (error) throw error;
-      return (data || []) as unknown as PaymentMethod[];
+      // `.in()` lives in the URL, so large id lists must be requested in batches
+      const out: any[] = [];
+      for (let i = 0; i < ids.length; i += 100) {
+        const { data, error } = await supabase
+          .from("payment_methods" as any)
+          .select("*")
+          .in("user_id", ids.slice(i, i + 100));
+        if (error) {
+          console.error("Failed to load a batch of payment methods", error);
+          continue;
+        }
+        out.push(...(data || []));
+      }
+      return out as unknown as PaymentMethod[];
     },
   });
 };
