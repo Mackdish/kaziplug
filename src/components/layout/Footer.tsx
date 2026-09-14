@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Briefcase, Mail, MapPin, Phone } from "lucide-react";
+import { Briefcase, Mail, MapPin } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -48,10 +48,6 @@ const Footer = () => {
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 support@nextgig.co.ke
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                +254 700 000 000
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
