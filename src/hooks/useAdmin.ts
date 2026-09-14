@@ -34,13 +34,13 @@ async function fetchAllPages<T = any>(
 }
 
 /** `.in()` goes in the URL, so a big id list produces a 414. Fetch in chunks. */
-async function fetchProfilesByIds(ids: string[], columns: string) {
+async function fetchProfilesByIds(ids: string[], columns: string[]) {
   const unique = uniq(ids);
   const out: any[] = [];
   for (const part of chunk(unique, 100)) {
     const { data, error } = await supabase
       .from("profiles")
-      .select(columns)
+      .select(columns.join(", "))
       .in("user_id", part);
     if (error) {
       console.error("Failed to load a batch of profiles", error);
@@ -129,7 +129,7 @@ export const useAdminUsers = (roleFilter?: string) => {
       if (userIds.length === 0) return [];
 
       const [profiles, emails] = await Promise.all([
-        fetchProfilesByIds(userIds, "user_id, full_name, phone, avatar_url, bio"),
+        fetchProfilesByIds(userIds, ["user_id", "full_name", "phone", "avatar_url", "bio"]),
         fetchEmailsByIds(userIds),
       ]);
 
@@ -155,7 +155,7 @@ export const useAdminTasks = () => {
           .select(`
             *,
             category:categories(name),
-            bids(id, freelancer_id, amount, status, proposal, created_at)
+            bids:bids!bids_task_id_fkey(id, freelancer_id, amount, status, proposal, created_at)
           `)
           .order("created_at", { ascending: false })
           .range(from, to)
@@ -170,7 +170,7 @@ export const useAdminTasks = () => {
       if (allUserIds.length === 0) return data;
 
       const [profiles, emails] = await Promise.all([
-        fetchProfilesByIds(allUserIds, "user_id, full_name, avatar_url, phone"),
+        fetchProfilesByIds(allUserIds, ["user_id", "full_name", "avatar_url", "phone"]),
         fetchEmailsByIds(allUserIds),
       ]);
 
@@ -188,6 +188,8 @@ export const useAdminTasks = () => {
         })),
       }));
     },
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 };
 
@@ -206,7 +208,7 @@ export const useAdminWithdrawals = () => {
       const userIds = uniq(data.map((w: any) => w.user_id));
       if (userIds.length === 0) return data;
 
-      const profiles = await fetchProfilesByIds(userIds, "user_id, full_name, phone");
+      const profiles = await fetchProfilesByIds(userIds, ["user_id", "full_name", "phone"]);
       const profileMap = new Map(profiles.map((p: any) => [p.user_id, p]));
 
       return data.map((w: any) => ({
@@ -279,7 +281,7 @@ export const useAdminFreelancers = () => {
       const userIds = roles.map((r: any) => r.user_id);
       if (userIds.length === 0) return [];
 
-      const profiles = await fetchProfilesByIds(userIds, "user_id, full_name");
+      const profiles = await fetchProfilesByIds(userIds, ["user_id", "full_name"]);
       const profileMap = new Map(profiles.map((p: any) => [p.user_id, p]));
 
       return userIds.map((id) => ({
@@ -338,7 +340,7 @@ export const useAdminBids = () => {
       const bids = await fetchAllPages((from, to) =>
         supabase
           .from("bids")
-          .select("*, task:tasks(id, title, budget, status, client_id)")
+          .select("*, task:tasks!bids_task_id_fkey(id, title, budget, status, client_id)")
           .order("created_at", { ascending: false })
           .range(from, to)
       );
@@ -351,7 +353,7 @@ export const useAdminBids = () => {
       if (allIds.length === 0) return bids;
 
       const [profiles, emails] = await Promise.all([
-        fetchProfilesByIds(allIds, "user_id, full_name, avatar_url, phone"),
+        fetchProfilesByIds(allIds, ["user_id", "full_name", "avatar_url", "phone"]),
         fetchEmailsByIds(allIds),
       ]);
 
@@ -365,5 +367,7 @@ export const useAdminBids = () => {
         client_profile: b.task?.client_id ? profileMap.get(b.task.client_id) || null : null,
       }));
     },
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 };
