@@ -13,6 +13,8 @@ const Marketplace = lazy(() => import("./pages/Marketplace"));
 const TaskDetails = lazy(() => import("./pages/TaskDetails"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const PostTask = lazy(() => import("./pages/PostTask"));
 const About = lazy(() => import("./pages/About"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
@@ -65,6 +67,8 @@ const App = () => (
               <Route path="/task/:id" element={<TaskDetails />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/about" element={<About />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/categories" element={<Categories />} />
